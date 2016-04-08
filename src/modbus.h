@@ -43,7 +43,7 @@ struct req_str {
 typedef union req_un {
 	struct req_str structure;
 	uint8_t string[sizeof(struct req_str)];
-} req_un_type;
+} req_un_t;
 
 union {
 	float a;
@@ -64,8 +64,9 @@ extern uint8_t *make_discrete_inputs_request(uint8_t dev_addr,
 		uint16_t reg_addr, uint16_t reg_value);
 extern uint8_t *make_read_coils_request(uint8_t dev_addr, uint16_t reg_addr,
 		uint16_t reg_value);
-extern int get_device(int fd, uint8_t dev_addr, uint16_t reg_addr,
-		uint16_t reg_data, uint8_t *device_memorie);
+extern uint8_t *alloc_response(uint8_t *request, int *size);
+//extern int get_device(int fd, uint8_t dev_addr, uint16_t reg_addr,
+//		uint16_t reg_data, uint8_t *device_memorie);
 extern uint8_t *fromFloat(float in);
 extern float toFloat(uint8_t *in);
 

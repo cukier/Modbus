@@ -79,7 +79,7 @@ uint8_t *make_request(uint8_t dev_addr, uint16_t reg_addr, uint16_t reg_data,
 		uint8_t type) {
 	int cont;
 	uint8_t *ret, aux[6];
-	req_un_type request;
+	req_un_t request;
 
 	request.structure.addr = dev_addr;
 	request.structure.cmd = type;
@@ -117,29 +117,43 @@ uint8_t *make_read_coils_request(uint8_t dev_addr, uint16_t reg_addr,
 	return make_request(dev_addr, reg_addr, reg_value, READ_COILS);
 }
 
-int get_device(int fd, uint8_t dev_addr, uint16_t reg_addr, uint16_t reg_data,
-		uint8_t *device_memorie) {
-	uint8_t *request, *response;
-	int n, cont, ret;
+uint8_t *alloc_response(uint8_t *request, int *size) {
+	uint8_t *ret;
 
-	request = make_read_request(dev_addr, reg_addr, reg_data);
-	response = (uint8_t *) malloc(sizeof(BUFFER_S));
+	*size = (int) make_word(request[4], request[5]) * 2;
 
-	n = make_transaction(fd, request, response, REQUEST_SIZE);
+	if (*size <= 0)
+		return NULL;
 
-	if (n == -1)
-		return -1;
-
-	ret = response[2];
-
-	for (cont = 0; cont < ret; ++cont)
-		device_memorie[cont] = response[cont + 3];
-
-	free(request);
-	free(response);
+	*size += 5;
+	ret = (uint8_t *) malloc(*size);
 
 	return ret;
 }
+
+//int get_device(int fd, uint8_t dev_addr, uint16_t reg_addr, uint16_t reg_data,
+//		uint8_t *device_memorie) {
+//	uint8_t *request, *response;
+//	int n, cont, ret;
+//
+//	request = make_read_request(dev_addr, reg_addr, reg_data);
+//	response = (uint8_t *) malloc(sizeof(BUFFER_S));
+//
+//	n = make_transaction(fd, request, response, REQUEST_SIZE, BUFFER_S);
+//
+//	if (n == -1)
+//		return -1;
+//
+//	ret = response[2];
+//
+//	for (cont = 0; cont < ret; ++cont)
+//		device_memorie[cont] = response[cont + 3];
+//
+//	free(request);
+//	free(response);
+//
+//	return ret;
+//}
 
 uint8_t *fromFloat(float value) {
 	uint8_t *ret;
