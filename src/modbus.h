@@ -85,12 +85,26 @@ typedef enum modbus_fields {
 	MODBUS_FIELDS_BYTE_COUNT
 } modbus_fields_t;
 
+typedef enum modbus_command_exception_code {
+	EXCEPTION_CODE_0,
+	EXCEPTION_CODE_1,
+	EXCEPTION_CODE_2,
+	EXCEPTION_CODE_3,
+	EXCEPTION_CODE_4
+} modbus_command_exception_code_t;
+
 typedef enum read_holding_registers_exceptions {
 	FUNCTION_CODE_NOT_SUPPORTED_EXCEPTION = 0x01,
 	ADDRESS_EXCEPTION,
 	QUANTITY_OF_REGISTERS_EXCEPTION,
 	READ_MULTIPLE_REGISTER_EXCEPTION
 } read_holding_registers_exceptions_t;
+
+typedef enum write_single_register_exceptions {
+	OUTPUT_ADDRESS_EXCEPTION = 0x02,
+	OUTPUT_VALUE_EXCEPTION,
+	WRITE_SINGLE_OUTPUT_EXCEPTION
+} write_single_register_exceptions_t;
 
 typedef struct modbus_response {
 	int address;
@@ -164,17 +178,18 @@ extern exception_t make_transaction(int dev_addr, long from, long size,
 		int byte_count, int *data, modbus_command_t command,
 		modbus_rx_t *modbus_response, door_t sl);
 extern int get_word_mem(modbus_rx_t *device, long *resp);
-extern exception_t transport(int dev_addr, long from, long size,
-		int byte_count, int *data, long *resp, modbus_command_t command,
-		door_t sl);
-extern exception_t read_holding_registers(int dev_addr, long from,
-		long size, long *to, door_t sl);
-extern exception_t read_discrete_inputs(int dev_addr, long from,
-		long size, long *to, door_t sl);
-extern exception_t read_coils(int dev_addr, long from, long size,
+extern exception_t transport(int dev_addr, long from, long size, int byte_count,
+		int *data, long *resp, modbus_command_t command, door_t sl);
+extern exception_t read_holding_registers(int dev_addr, long from, long size,
 		long *to, door_t sl);
-extern int send_modbus(door_t sl, long size, int *data);
-extern exception_t write_multiple_registers(int dev_addr, long from,
-		long size, long byte_count, int *data, door_t sl);
+extern exception_t read_discrete_inputs(int dev_addr, long from, long size,
+		long *to, door_t sl);
+extern exception_t read_coils(int dev_addr, long from, long size, long *to,
+		door_t sl);
+extern exception_t send_modbus(int *data, long size);
+extern exception_t return_error(int dev_addr, modbus_command_t command,
+		modbus_command_exception_code_t error);
+extern exception_t write_multiple_registers(int dev_addr, long from, long size,
+		long byte_count, int *data, door_t sl);
 
 #endif /* MODBUS_H_ */

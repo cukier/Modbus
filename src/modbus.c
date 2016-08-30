@@ -69,23 +69,26 @@ void isr_rda2_timer() {
 #endif
 
 exception_t slave_response() {
-	long cont, crc, register_value, register_address, b_count;
+	short rbt;
+	long cont, crc, register_value, register_address, b_count, size, m_index,
+			m_cmd;
 	int *resp, *buff;
-	size_t
-	size;
 
 #ifdef USE_UART1
 #if (SL1_TYPE == SL_MULTI_MASTER)
 	buff = buffer_rda;
+	m_index = index_rda;
 #endif
 #endif
 #ifdef USE_UART2
 #if (SL2_TYPE == SL_MULTI_MASTER)
 	buff = buffer_rda2;
+	m_index = index_rda2;
 #endif
 #endif
 
 	size = 0;
+	rbt = FALSE;
 	register_value = make16(buff[MODBUS_FIELDS_REGISTER_VALUE_H],
 			buff[MODBUS_FIELDS_REGISTER_VALUE_L]);
 	register_address = make16(buff[MODBUS_FIELDS_REGISTER_ADDRESS_H],
@@ -96,17 +99,18 @@ exception_t slave_response() {
 		switch (buff[MODBUS_FIELDS_FUNCTION]) {
 		case READ_HOLDING_REGISTERS_COMMAND:
 
-			if (register_value == 0 || register_value > 0x007D) {
+			if (register_value == 0 || register_value > 0x007D
+					|| m_index != 8) {
 				size = 5;
 				resp = NULL;
-				resp = (int *) malloc(size);
+				resp = (int *) malloc((size_t) (size * sizeof(int)));
 
 				if (resp == NULL) {
 					free(resp);
 					return OUT_OF_MEMORY_EXCEPTION;
 				}
 
-				resp[0] = my_address;
+				resp[0] = (int) my_address;
 				resp[1] = 0x83;
 				resp[2] = 0x03;
 				crc = CRC16(resp, 3);
@@ -120,7 +124,7 @@ exception_t slave_response() {
 					return OUT_OF_MEMORY_EXCEPTION;
 				}
 
-				resp[0] = my_address;
+				resp[0] = (int) my_address;
 				resp[1] = 0x83;
 				resp[2] = 0x02;
 				crc = CRC16(resp, 3);
@@ -134,15 +138,18 @@ exception_t slave_response() {
 					return OUT_OF_MEMORY_EXCEPTION;
 				}
 
-				resp[0] = my_address;
+				resp[0] = (int) my_address;
 				resp[1] = READ_HOLDING_REGISTERS_COMMAND;
 				resp[2] = (int) register_value * 2;
 #ifdef DEBUG
-				DEBUG_DATA2("Requesicao de leitura por %lu registradores no end. %lu\n\r", register_value, register_address);
+				DEBUG_DATA2("Requesicao de leitura por %lu registradores no end. %lu\n", register_value, register_address);
 #endif
 
 				for (cont = 0; cont < register_value; ++cont) {
-					resp[cont + 3] = read_eeprom(register_address + cont);
+					resp[2 * cont + 3] = read_eeprom(
+							register_address + 2 * cont);
+					resp[2 * cont + 4] = read_eeprom(
+							register_address + 2 * cont + 1);
 				}
 
 				crc = CRC16(resp, (register_value * 2) + 3);
@@ -154,39 +161,24 @@ exception_t slave_response() {
 
 		case WRITE_SINGLE_REGISTER_COMMAND:
 
-			//todo: adicionar checagem de comando invalido
+			if (register_value == 0 || register_value > 0x007D
+					|| m_index != 8) {
+				size = 5;
+				resp = NULL;
+				resp = (int *) malloc((size_t) (size * sizeof(int)));
 
-			size = (size_t)(8);
-			resp = NULL;
-			resp = (int *) malloc(size);
+				if (resp == NULL) {
+					free(resp);
+					return OUT_OF_MEMORY_EXCEPTION;
+				}
 
-			if (resp == NULL) {
-				free(resp);
-				return OUT_OF_MEMORY_EXCEPTION;
-			}
-
-#ifdef DEBUG
-			DEBUG_DATA2("Requesicao de escrita (func 06) no endereco %05lu valor %05lu\n\r", register_address, register_value);
-#endif
-
-			write_eeprom(register_address, make8(register_value, 0));
-
-			resp[0] = my_address;
-			resp[1] = WRITE_SINGLE_REGISTER_COMMAND;
-			resp[2] = (int) make8(register_address, 1);
-			resp[3] = (int) make8(register_address, 0);
-			resp[4] = (int) make8(register_value, 1);
-			resp[5] = (int) make8(register_value, 0);
-			crc = CRC16(resp, 6);
-			resp[6] = (int) make8(crc, 1);
-			resp[7] = (int) make8(crc, 0);
-
-			break;
-
-		case WRITE_MULTIPLE_REGISTERS_COMMAND:
-
-			if (register_value == 0 || register_value > 0x007B
-					|| b_count != 2 * register_value) {
+				resp[0] = (int) my_address;
+				resp[1] = 0x86;
+				resp[2] = 0x03;
+				crc = CRC16(resp, 3);
+				resp[4] = make8(crc, 1);
+				resp[5] = make8(crc, 0);
+			} else if (register_value + register_address >= UINT16_MAX) {
 				size = 5;
 				resp = NULL;
 				resp = (int *) malloc(size);
@@ -196,7 +188,58 @@ exception_t slave_response() {
 					return OUT_OF_MEMORY_EXCEPTION;
 				}
 
-				resp[0] = my_address;
+				resp[0] = (int) my_address;
+				resp[1] = 0x86;
+				resp[2] = 0x02;
+				crc = CRC16(resp, 3);
+				resp[4] = make8(crc, 1);
+				resp[5] = make8(crc, 0);
+			} else {
+
+				size = (size_t)(8 * sizeof(int));
+				resp = NULL;
+				resp = (int *) malloc(size);
+
+				if (resp == NULL) {
+					free(resp);
+					return OUT_OF_MEMORY_EXCEPTION;
+				}
+
+#ifdef DEBUG
+				DEBUG_DATA2("Requesicao de escrita (func 06) no endereco %05lu valor %05lu\n", register_address, register_value);
+#endif
+
+				write_eeprom(register_address, make8(register_value, 1));
+				write_eeprom(register_address + 1, make8(register_value, 0));
+
+				resp[0] = (int) my_address;
+				resp[1] = WRITE_SINGLE_REGISTER_COMMAND;
+				resp[2] = (int) make8(register_address, 1);
+				resp[3] = (int) make8(register_address, 0);
+				resp[4] = (int) make8(register_value, 1);
+				resp[5] = (int) make8(register_value, 0);
+				crc = CRC16(resp, 6);
+				resp[6] = (int) make8(crc, 1);
+				resp[7] = (int) make8(crc, 0);
+			}
+
+			break;
+
+		case WRITE_MULTIPLE_REGISTERS_COMMAND:
+
+			if (register_value == 0 || register_value > 0x007B
+					|| b_count != 2 * register_value
+					|| m_index != (b_count + 9)) {
+				size = 5;
+				resp = NULL;
+				resp = (int *) malloc(size);
+
+				if (resp == NULL) {
+					free(resp);
+					return OUT_OF_MEMORY_EXCEPTION;
+				}
+
+				resp[0] = (int) my_address;
 				resp[1] = 0x90;
 				resp[2] = 0x03;
 				crc = CRC16(resp, 3);
@@ -210,7 +253,7 @@ exception_t slave_response() {
 					return OUT_OF_MEMORY_EXCEPTION;
 				}
 
-				resp[0] = my_address;
+				resp[0] = (int) my_address;
 				resp[1] = 0x90;
 				resp[2] = 0x02;
 				crc = CRC16(resp, 3);
@@ -227,10 +270,10 @@ exception_t slave_response() {
 
 				for (cont = 0; cont < b_count; ++cont) {
 					write_eeprom(register_address + cont,
-							make8(buff[cont + MODBUS_FIELDS_BYTE_COUNT], 0));
+							buff[cont + MODBUS_FIELDS_BYTE_COUNT + 1]);
 				}
 
-				resp[0] = my_address;
+				resp[0] = (int) my_address;
 				resp[1] = WRITE_MULTIPLE_REGISTERS_COMMAND;
 				resp[2] = (int) make8(register_address, 1);
 				resp[3] = (int) make8(register_address, 0);
@@ -240,9 +283,49 @@ exception_t slave_response() {
 				resp[6] = (int) make8(crc, 1);
 				resp[7] = (int) make8(crc, 0);
 			}
+
 			break;
 
 		default:
+			break;
+		}
+	}
+
+	m_cmd = 0;
+	m_cmd = make16(read_eeprom(CMD_ADDR), read_eeprom(CMD_ADDR + 1));
+	if ((int) m_cmd != CMD_IDLE) {
+
+#ifdef DEBUG
+		DEBUG_DATA("Recebido comando %lu\n", make16(read_eeprom(CMD_ADDR), read_eeprom(CMD_ADDR + 1)));
+#endif
+
+		write_eeprom(CMD_ADDR, 0);
+		write_eeprom(CMD_ADDR + 1, CMD_IDLE);
+		switch (register_value) {
+		case CMD_RESET:
+			rbt = TRUE;
+			break;
+		case CMD_RESET_INDEX:
+			diff_index = 0;
+			write_eeprom(DIFF_INDEX_ADDR_HH, 0);
+			write_eeprom(DIFF_INDEX_ADDR_LH, 0);
+			write_eeprom(DIFF_INDEX_ADDR_HL, 0);
+			write_eeprom(DIFF_INDEX_ADDR_LL, 0);
+#ifdef DEBUG
+			DEBUG_MSG("Index Reiniciado\n");
+#endif
+			break;
+		case CMD_LER_BLOCO:
+#ifdef DEBUG
+			DEBUG_MSG("Enviando block\n");
+#endif
+			free(resp);
+			return send_block();
+			break;
+		default:
+#ifdef DEBUG
+			DEBUG_MSG("Comando Desconhecido\n");
+#endif
 			break;
 		}
 	}
@@ -273,6 +356,11 @@ exception_t slave_response() {
 	flush_buffer(buffer_rda2, &index_rda2);
 #endif
 #endif
+
+	if (rbt) {
+		rbt = FALSE;
+		reset_cpu();
+	}
 
 	return NO_EXCEPTION;
 }
@@ -327,7 +415,8 @@ int parse_error(exception_t error, char *msg) {
 		strcpy(msg, "modbus exception");
 		break;
 	case NOT_SUPPORTED_EXCEPTION:
-		strcpy(msg, "wrong sintaxe");
+		strcpy(msg, "operacao nao suportada");
+		break;
 	default:
 		strcpy(msg, "unknown error");
 		break;
@@ -514,8 +603,7 @@ exception_t read_modbus_response(int *req, int *resp, door_t sl) {
 
 	return NO_EXCEPTION;
 }
-exception_t mount_modbus_response(modbus_rx_t *modbus_response,
-		int *resp) {
+exception_t mount_modbus_response(modbus_rx_t *modbus_response, int *resp) {
 	int cont, size, *data;
 
 	data = NULL;
@@ -577,9 +665,9 @@ short check_CRC(int *resp, modbus_command_t command) {
 	return crc_check == crc_in;;
 }
 
-exception_t make_transaction(int dev_addr, long from, long size,
-		int byte_count, int *data, modbus_command_t command,
-		modbus_rx_t *modbus_response, door_t sl) {
+exception_t make_transaction(int dev_addr, long from, long size, int byte_count,
+		int *data, modbus_command_t command, modbus_rx_t *modbus_response,
+		door_t sl) {
 	int *req, *resp;
 	long resp_size;
 	exception_t resul;
@@ -713,45 +801,76 @@ exception_t transport(int dev_addr, long from, long size, int byte_count,
 
 }
 
-exception_t read_holding_registers(int dev_addr, long from, long size,
-		long *to, door_t sl) {
+exception_t read_holding_registers(int dev_addr, long from, long size, long *to,
+		door_t sl) {
 	return transport(dev_addr, from, size, 0, NULL, to,
 			READ_HOLDING_REGISTERS_COMMAND, sl);
 }
 
-exception_t read_discrete_inputs(int dev_addr, long from, long size,
-		long *to, door_t sl) {
+exception_t read_discrete_inputs(int dev_addr, long from, long size, long *to,
+		door_t sl) {
 
 	return transport(dev_addr, from, size, 0, NULL, to,
 			READ_DISCRETE_INPUT_COMMAND, sl);
 }
 
-exception_t read_coils(int dev_addr, long from, long size, long *to,
-		door_t sl) {
+exception_t read_coils(int dev_addr, long from, long size, long *to, door_t sl) {
 
 	return transport(dev_addr, from, size, 0, NULL, to, READ_COILS_COMMAND, sl);
 }
 
-exception_t send_modbus(door_t sl, long size, int *data) {
+exception_t send_modbus(int *data, long size) {
 	long cont;
+	int *ptr;
 
-	for (cont = 0; cont < size; ++cont) {
-		if (sl == SL1_DOOR) {
+	for (cont = 0, ptr = data; cont < size; cont++, ptr++) {
 #ifdef USE_UART1
-#if (SL1_TYPE == SL_MASTER)
-			fputc(data[cont], sl1);
+#if (SL1_TYPE == SL_MULTI_MASTER)
+		fputc(*ptr, sl1);
 #endif
 #endif
-		} else {
 #ifdef USE_UART2
-#if (SL2_TYPE == SL_MASTER)
-			fputc(data[cont], sl2);
+#if (SL2_TYPE == SL_MULTI_MASTER)
+		fputc(*ptr, sl2);
 #endif
 #endif
-		}
 	}
 
-	return 0;
+	return NO_EXCEPTION;
+}
+
+exception_t return_error(int dev_addr, modbus_command_t command,
+		modbus_command_exception_code_t error) {
+	int *resp;
+	long crc, size;
+
+	switch (command) {
+	case WRITE_SINGLE_REGISTER_COMMAND:
+		size = 5;
+		resp = NULL;
+		resp = (int *) malloc((size_t)(size * sizeof(int)));
+
+		if (resp == NULL) {
+			free(resp);
+			return OUT_OF_MEMORY_EXCEPTION;
+		}
+
+		resp[0] = (int) my_address;
+		resp[1] = 0x86;
+		resp[2] = error;
+		crc = CRC16(resp, 3);
+		resp[3] = make8(crc, 1);
+		resp[4] = make8(crc, 0);
+
+		break;
+	default:
+		break;
+	}
+
+	send_modbus(resp, size);
+	free(resp);
+
+	return NO_EXCEPTION;
 }
 
 exception_t write_multiple_registers(int dev_addr, long from, long size,
