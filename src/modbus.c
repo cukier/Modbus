@@ -1,68 +1,58 @@
 /*
  * modbus.c
  *
- *  Created on: 03/12/2014
+ *  Created on: 20/08/2015
  *      Author: cuki
+ *
+ *
+ *
  */
 
 #include "modbus.h"
 #include "serial.h"
-#include <stdio.h>
-#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
 
-const uint16_t wCRCTable[] = { 0X0000, 0XC0C1, 0XC181, 0X0140, 0XC301, 0X03C0,
-		0X0280, 0XC241, 0XC601, 0X06C0, 0X0780, 0XC741, 0X0500, 0XC5C1, 0XC481,
-		0X0440, 0XCC01, 0X0CC0, 0X0D80, 0XCD41, 0X0F00, 0XCFC1, 0XCE81, 0X0E40,
-		0X0A00, 0XCAC1, 0XCB81, 0X0B40, 0XC901, 0X09C0, 0X0880, 0XC841, 0XD801,
-		0X18C0, 0X1980, 0XD941, 0X1B00, 0XDBC1, 0XDA81, 0X1A40, 0X1E00, 0XDEC1,
-		0XDF81, 0X1F40, 0XDD01, 0X1DC0, 0X1C80, 0XDC41, 0X1400, 0XD4C1, 0XD581,
-		0X1540, 0XD701, 0X17C0, 0X1680, 0XD641, 0XD201, 0X12C0, 0X1380, 0XD341,
-		0X1100, 0XD1C1, 0XD081, 0X1040, 0XF001, 0X30C0, 0X3180, 0XF141, 0X3300,
-		0XF3C1, 0XF281, 0X3240, 0X3600, 0XF6C1, 0XF781, 0X3740, 0XF501, 0X35C0,
-		0X3480, 0XF441, 0X3C00, 0XFCC1, 0XFD81, 0X3D40, 0XFF01, 0X3FC0, 0X3E80,
-		0XFE41, 0XFA01, 0X3AC0, 0X3B80, 0XFB41, 0X3900, 0XF9C1, 0XF881, 0X3840,
-		0X2800, 0XE8C1, 0XE981, 0X2940, 0XEB01, 0X2BC0, 0X2A80, 0XEA41, 0XEE01,
-		0X2EC0, 0X2F80, 0XEF41, 0X2D00, 0XEDC1, 0XEC81, 0X2C40, 0XE401, 0X24C0,
-		0X2580, 0XE541, 0X2700, 0XE7C1, 0XE681, 0X2640, 0X2200, 0XE2C1, 0XE381,
-		0X2340, 0XE101, 0X21C0, 0X2080, 0XE041, 0XA001, 0X60C0, 0X6180, 0XA141,
-		0X6300, 0XA3C1, 0XA281, 0X6240, 0X6600, 0XA6C1, 0XA781, 0X6740, 0XA501,
-		0X65C0, 0X6480, 0XA441, 0X6C00, 0XACC1, 0XAD81, 0X6D40, 0XAF01, 0X6FC0,
-		0X6E80, 0XAE41, 0XAA01, 0X6AC0, 0X6B80, 0XAB41, 0X6900, 0XA9C1, 0XA881,
-		0X6840, 0X7800, 0XB8C1, 0XB981, 0X7940, 0XBB01, 0X7BC0, 0X7A80, 0XBA41,
-		0XBE01, 0X7EC0, 0X7F80, 0XBF41, 0X7D00, 0XBDC1, 0XBC81, 0X7C40, 0XB401,
-		0X74C0, 0X7580, 0XB541, 0X7700, 0XB7C1, 0XB681, 0X7640, 0X7200, 0XB2C1,
-		0XB381, 0X7340, 0XB101, 0X71C0, 0X7080, 0XB041, 0X5000, 0X90C1, 0X9181,
-		0X5140, 0X9301, 0X53C0, 0X5280, 0X9241, 0X9601, 0X56C0, 0X5780, 0X9741,
-		0X5500, 0X95C1, 0X9481, 0X5440, 0X9C01, 0X5CC0, 0X5D80, 0X9D41, 0X5F00,
-		0X9FC1, 0X9E81, 0X5E40, 0X5A00, 0X9AC1, 0X9B81, 0X5B40, 0X9901, 0X59C0,
-		0X5880, 0X9841, 0X8801, 0X48C0, 0X4980, 0X8941, 0X4B00, 0X8BC1, 0X8A81,
-		0X4A40, 0X4E00, 0X8EC1, 0X8F81, 0X4F40, 0X8D01, 0X4DC0, 0X4C80, 0X8C41,
-		0X4400, 0X84C1, 0X8581, 0X4540, 0X8701, 0X47C0, 0X4680, 0X8641, 0X8201,
-		0X42C0, 0X4380, 0X8341, 0X4100, 0X81C1, 0X8081, 0X4040 };
+uint16_t swap_w(uint16_t word) {
+	uint16_t aux;
 
-uint8_t make_byte(uint16_t word, uint8_t index) {
-	uint8_t ret = 0;
-	uint16_t mask = 0xFF << (index * 8);
+	aux = (word & 0xFF00) >> 8;
+	aux |= (word & 0x00FF) << 8;
 
-	ret = (mask & word) >> (index * 8);
-
-	return ret;
+	return aux;
 }
 
-uint16_t make_word(uint8_t hiByte, uint8_t loByte) {
-	uint16_t ret = 0;
-
-	ret = (hiByte & 0xFF) << 8;
-	ret |= loByte & 0xFF;
-
-	return ret;
+uint32_t get_dword(uint16_t address) {
+	uint16_t addr = address * 2;
+	return make32(read_eeprom(addr), read_eeprom(addr + 1),
+			read_eeprom(addr + 2), read_eeprom(addr + 3));
 }
 
-uint16_t swap16(uint16_t in) {
-	return make_word(make_byte(in, 0), make_byte(in, 1));
+uint8_t set_dword(uint16_t address, uint32_t value) {
+	uint16_t addr = address * 2;
+	write_eeprom(addr, make8(value, 3));
+	write_eeprom(addr + 1, make8(value, 2));
+	write_eeprom(addr + 2, make8(value, 1));
+	write_eeprom(addr + 3, make8(value, 0));
+	return 0;
 }
 
-uint16_t CRC16(uint8_t *nData, uint16_t wLength) {
+uint16_t get_register(uint16_t address) {
+	uint16_t addr = address * 2;
+
+	return make16(read_eeprom(addr), read_eeprom(addr + 1));
+}
+
+uint8_t set_register(uint16_t address, uint16_t value) {
+	uint16_t addr = address * 2;
+
+	write_eeprom(addr, make8(value, 1));
+	write_eeprom(addr + 1, make8(value, 0));
+
+	return 0;
+}
+
+uint8_t CRC16(uint8_t *nData, uint16_t wLength) {
 	uint8_t nTemp;
 	uint16_t wCRCWord = 0xFFFF;
 
@@ -75,106 +65,201 @@ uint16_t CRC16(uint8_t *nData, uint16_t wLength) {
 	return wCRCWord;
 }
 
-uint8_t *make_request(uint8_t dev_addr, uint16_t reg_addr, uint16_t reg_data,
-		uint8_t type) {
-	int cont;
-	uint8_t *ret, aux[6];
-	req_un_t request;
+uint8_t make_request(uint8_t dev_addr, uint16_t from, uint16_t size,
+		uint8_t byte_count, uint8_t *data, modbus_command_t command,
+		uint8_t *req) {
+	uint16_t crc, cont;
 
-	request.structure.addr = dev_addr;
-	request.structure.cmd = type;
-	request.structure.from = swap16(reg_addr);
-	request.structure.to = swap16(reg_data);
+	req[0] = dev_addr;
+	req[1] = (uint8_t) command;
+	req[2] = make8(from, 1);
+	req[3] = make8(from, 0);
+	req[4] = make8(size, 1);
+	req[5] = make8(size, 0);
 
-	for (cont = 0; cont < 6; ++cont)
-		aux[cont] = request.string[cont];
+	switch (command) {
+	case READ_COILS_COMMAND:
+	case READ_DISCRETE_INPUT_COMMAND:
+	case READ_HOLDING_REGISTERS_COMMAND:
+		crc = CRC16(req, 6);
+		req[6] = make8(crc, 0);
+		req[7] = make8(crc, 1);
+		break;
+	case WRITE_MULTIPLE_REGISTERS_COMMAND:
+		req[6] = byte_count;
 
-	request.structure.crc = CRC16(aux, 6);
-	ret = (uint8_t *) malloc(sizeof(REQUEST_SIZE));
+		for (cont = 0; cont < byte_count; cont += 2) {
+			req[7 + cont] = data[cont + 1];
+			req[8 + cont] = data[cont];
+		}
 
-	for (cont = 0; cont < REQUEST_SIZE; ++cont)
-		ret[cont] = request.string[cont];
+		crc = CRC16(req, cont + 7);
+		req[cont + 7] = make8(crc, 0);
+		req[cont + 8] = make8(crc, 1);
+		break;
+	default:
+		break;
+	}
 
-	return ret;
+	return 0;
 }
 
-uint8_t *make_read_request(uint8_t dev_addr, uint16_t from, uint16_t nr) {
-	return make_request(dev_addr, from, nr, READ_HOLDING_REGISTERS);
+uint8_t check_CRC(uint8_t *resp, modbus_command_t command) {
+	uint8_t *arr;
+	uint16_t ar_size, crc_check, crc_in, cont;
+
+	switch (command) {
+	case READ_HOLDING_REGISTERS_COMMAND:
+	case READ_COILS_COMMAND:
+	case READ_DISCRETE_INPUT_COMMAND:
+		ar_size = resp[2] + 3;
+		break;
+	case WRITE_MULTIPLE_REGISTERS_COMMAND:
+		ar_size = 6;
+		break;
+	default:
+		break;
+	}
+
+	arr = NULL;
+	arr = (uint8_t *) malloc((size_t) (ar_size * sizeof(uint8_t)));
+
+	if (arr == NULL) {
+		free(arr);
+		return 0;
+	}
+
+	for (cont = 0; cont < ar_size; ++cont)
+		arr[cont] = resp[cont];
+
+	crc_in = make16(resp[ar_size + 1], resp[ar_size]);
+	crc_check = CRC16(arr, ar_size);
+	free(arr);
+
+	return (uint8_t) (crc_check == crc_in);
 }
 
-uint8_t *make_write_request(uint8_t dev_addr, uint16_t reg_addr,
-		uint16_t reg_value) {
-	return make_request(dev_addr, reg_addr, reg_value, WRITE_SINGLE_REGISTER);
+uint8_t mount_modbus_response(modbus_response_t *response, uint8_t *resp) {
+	int cont, size, *data;
+
+	data = NULL;
+	size = resp[2];
+
+	response->address = resp[0];
+	response->function = resp[1];
+	response->response_size = size;
+
+	for (cont = 0; cont < size; ++cont)
+		response->data[cont] = resp[cont + 3];
+
+	response->crc = make16(resp[size + 4], resp[size + 3]);
+
+	return 0;
 }
 
-uint8_t *make_discrete_inputs_request(uint8_t dev_addr, uint16_t reg_addr,
-		uint16_t reg_value) {
-	return make_request(dev_addr, reg_addr, reg_value, READ_DISCRETE_INPUTS);
+uint8_t make_transaction(int fd, modbus_request_t *request,
+		modbus_response_t *response) {
+	uint8_t *req, *resp, resul;
+	uint16_t resp_size, req_size;
+	int fd;
+
+	resul = 0;
+	resp_size = 0;
+	req_size = 0;
+
+	switch (request->function) {
+	case READ_DISCRETE_INPUT_COMMAND:
+	case READ_COILS_COMMAND:
+		if (request->size <= 8)
+			resp_size = (size_t) (request->size / 8 + 5);
+		else
+			resp_size = (size_t) (request->size / 8 + 6);
+		req_size = REQUEST_SIZE;
+		break;
+	case READ_HOLDING_REGISTERS_COMMAND:
+		resp_size = (size_t) (request->size << 1) + 5;
+		req_size = REQUEST_SIZE;
+		break;
+	case WRITE_MULTIPLE_REGISTERS_COMMAND:
+		resp_size = (size_t) 6;
+		req_size = 9 + request->byte_count;
+		break;
+	}
+
+	req = NULL;
+	req = (uint8_t *) malloc((size_t) (req_size * sizeof(uint8_t)));
+
+	if (req == NULL) {
+		free(req);
+		return 1;
+	}
+
+	make_request(request->address, request->start_address, request->size,
+			request->byte_count, request->data, request->function, req);
+
+	resp = NULL;
+	resp = (uint8_t *) malloc(resp_size * sizeof(uint8_t));
+
+	if (resp == NULL) {
+		free(req);
+		free(resp);
+		return 1;
+	}
+
+	resul = serial_transaction(fd, req, resp, req_size, resp_size);
+	free(req);
+
+	if (resul != 0) {
+		free(resp);
+		return resul;
+	}
+
+	if (!check_CRC(resp, request->function)) {
+		free(resp);
+		return 2;
+	}
+
+	resul = mount_modbus_response(response, resp);
+	free(resp);
+
+	if (resul != 0)
+		return resul;
+
+	return 0;
 }
 
-uint8_t *make_read_coils_request(uint8_t dev_addr, uint16_t reg_addr,
-		uint16_t reg_value) {
-	return make_request(dev_addr, reg_addr, reg_value, READ_COILS);
-}
+uint8_t read_holding_registers(int fd, uint8_t dev_addr, uint16_t from,
+		uint16_t size, uint16_t *to) {
+	modbus_response_t *resp;
+	modbus_request_t *req;
 
-uint8_t *alloc_response(uint8_t *request, int *size) {
-	uint8_t *ret;
+	req = NULL;
+	req = (modbus_request_t *) malloc((size_t) (sizeof(modbus_request_t)));
+	resp = NULL;
+	resp = (modbus_response_t *) malloc((size_t) (sizeof(modbus_response_t)));
 
-	*size = (int) make_word(request[4], request[5]) * 2;
+	if (req == NULL || resp == NULL) {
+		free(req->data);
+		free(req);
+		free(resp->data);
+		free(resp);
+		return 1;
+	}
 
-	if (*size <= 0)
-		return NULL;
+	req->address = dev_addr;
+	req->start_address = from;
+	req->size = size;
+	req->function = READ_HOLDING_REGISTERS_COMMAND;
+	resp->data = to;
 
-	*size += 5;
-	ret = (uint8_t *) malloc(*size);
+	if (make_transaction(req, resp) != 0) {
+		free(req);
+		free(resp);
+		return 1;
+	}
 
-	return ret;
-}
+	free(req);
+	free(resp);
 
-//int get_device(int fd, uint8_t dev_addr, uint16_t reg_addr, uint16_t reg_data,
-//		uint8_t *device_memorie) {
-//	uint8_t *request, *response;
-//	int n, cont, ret;
-//
-//	request = make_read_request(dev_addr, reg_addr, reg_data);
-//	response = (uint8_t *) malloc(sizeof(BUFFER_S));
-//
-//	n = make_transaction(fd, request, response, REQUEST_SIZE, BUFFER_S);
-//
-//	if (n == -1)
-//		return -1;
-//
-//	ret = response[2];
-//
-//	for (cont = 0; cont < ret; ++cont)
-//		device_memorie[cont] = response[cont + 3];
-//
-//	free(request);
-//	free(response);
-//
-//	return ret;
-//}
-
-uint8_t *fromFloat(float value) {
-	uint8_t *ret;
-
-	ret = (uint8_t *) malloc(4);
-	un.a = value;
-
-	ret[1] = un.b[0];
-	ret[0] = un.b[1];
-	ret[3] = un.b[2];
-	ret[2] = un.b[3];
-
-	return ret;
-}
-
-float toFloat(uint8_t *reg) {
-
-	un.b[0] = reg[1];
-	un.b[1] = reg[0];
-	un.b[2] = reg[3];
-	un.b[3] = reg[2];
-
-	return un.a;
+	return 0;
 }

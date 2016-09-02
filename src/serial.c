@@ -6,9 +6,8 @@
 #include <termios.h>
 #include <stdlib.h>
 #include "serial.h"
-#include "modbus.h"
 
-int open_port(char *porta) {
+int serial_open_port(char *porta) {
 	int fd;
 
 	fd = open(porta, O_RDWR | O_NOCTTY | O_NDELAY);
@@ -16,7 +15,7 @@ int open_port(char *porta) {
 	return fd;
 }
 
-int set_port(int baud_rate, int fd) {
+int serial_set_port(int baud_rate, int fd) {
 	int ret;
 	struct termios options;
 	speed_t speed;
@@ -77,15 +76,15 @@ int set_port(int baud_rate, int fd) {
 	return 0;
 }
 
-int make_transaction(int fd, uint8_t *msg, uint8_t *resp, int msg_size,
+int serial_transaction(int fd, uint8_t *tx, uint8_t *rx, int msg_size,
 		int resp_size) {
 	int n = -1, tries = 1000;
 
 	tcflush(fd, TCIFLUSH);
-	write(fd, msg, msg_size);
+	write(fd, tx, msg_size);
 
 	while (n == -1 && (tries--) > 0) {
-		n = read(fd, resp, resp_size);
+		n = read(fd, rx, resp_size);
 		usleep(500000);
 	}
 
@@ -94,47 +93,3 @@ int make_transaction(int fd, uint8_t *msg, uint8_t *resp, int msg_size,
 
 	return n;
 }
-
-bool check_response(uint8_t *response, uint8_t *request) {
-	bool check = true;
-	int cont;
-
-	for (cont = 0; cont < 8; ++cont) {
-		if (cont == 5)
-			check &= response[cont] == 0x00;
-		else
-			check &= response[cont] == request[cont];
-	}
-
-	return check;
-}
-
-int clear_response(uint8_t *response, int size) {
-	int cont;
-
-	for (cont = 0; cont < size; ++cont)
-		response[cont] = 0;
-
-	return 0;
-}
-
-//int make_read_transaction(int fd, int dev_addr, uint8_t *response, int from,
-//		int count) {
-//	int n = -1;
-//	uint8_t *request;
-//
-//	request = (uint8_t *) malloc(REQUEST_SIZE);
-//
-//	clear_response(response, count);
-//	make_read_request(dev_addr, from, count);
-//	n = make_transaction(fd, request, response, count, count, NULL);
-//
-//	free(request);
-//
-//	if (n != count) {
-//		return -1;
-//	} else if (!check_response(response, request))
-//		return -2;
-//
-//	return n;
-//}
