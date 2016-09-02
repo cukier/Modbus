@@ -12,6 +12,7 @@
 #include <stdint.h>
 
 extern int serial_open_port(char *porta);
+extern int serial_close_port(int fd);
 extern int serial_set_port(int baud_rate, int fd);
 extern int serial_transaction(int fd, uint8_t *msg, uint8_t *resp, int msg_size,
 		int resp_size);

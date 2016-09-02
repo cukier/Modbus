@@ -8,6 +8,8 @@
 #ifndef MODBUS_H_
 #define MODBUS_H_
 
+#include <stdint.h>
+
 #define REQUEST_SIZE	8
 
 typedef enum doors_enum {

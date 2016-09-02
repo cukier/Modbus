@@ -12,44 +12,14 @@
 #include "serial.h"
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 
-uint16_t swap_w(uint16_t word) {
-	uint16_t aux;
-
-	aux = (word & 0xFF00) >> 8;
-	aux |= (word & 0x00FF) << 8;
-
-	return aux;
+uint16_t make16(uint8_t varhigh, uint8_t varlow) {
+	return (uint16_t) (varhigh & 0xff) * 0x100 + (varlow & 0xff);
 }
 
-uint32_t get_dword(uint16_t address) {
-	uint16_t addr = address * 2;
-	return make32(read_eeprom(addr), read_eeprom(addr + 1),
-			read_eeprom(addr + 2), read_eeprom(addr + 3));
-}
-
-uint8_t set_dword(uint16_t address, uint32_t value) {
-	uint16_t addr = address * 2;
-	write_eeprom(addr, make8(value, 3));
-	write_eeprom(addr + 1, make8(value, 2));
-	write_eeprom(addr + 2, make8(value, 1));
-	write_eeprom(addr + 3, make8(value, 0));
-	return 0;
-}
-
-uint16_t get_register(uint16_t address) {
-	uint16_t addr = address * 2;
-
-	return make16(read_eeprom(addr), read_eeprom(addr + 1));
-}
-
-uint8_t set_register(uint16_t address, uint16_t value) {
-	uint16_t addr = address * 2;
-
-	write_eeprom(addr, make8(value, 1));
-	write_eeprom(addr + 1, make8(value, 0));
-
-	return 0;
+uint8_t make8(uint32_t var, uint8_t offset) {
+	return (uint8_t) (((var >> (offset * 8)) & 0xff));
 }
 
 uint8_t CRC16(uint8_t *nData, uint16_t wLength) {
@@ -140,9 +110,8 @@ uint8_t check_CRC(uint8_t *resp, modbus_command_t command) {
 }
 
 uint8_t mount_modbus_response(modbus_response_t *response, uint8_t *resp) {
-	int cont, size, *data;
+	int cont, size;
 
-	data = NULL;
 	size = resp[2];
 
 	response->address = resp[0];
@@ -161,7 +130,6 @@ uint8_t make_transaction(int fd, modbus_request_t *request,
 		modbus_response_t *response) {
 	uint8_t *req, *resp, resul;
 	uint16_t resp_size, req_size;
-	int fd;
 
 	resul = 0;
 	resp_size = 0;
@@ -250,9 +218,9 @@ uint8_t read_holding_registers(int fd, uint8_t dev_addr, uint16_t from,
 	req->start_address = from;
 	req->size = size;
 	req->function = READ_HOLDING_REGISTERS_COMMAND;
-	resp->data = to;
+	resp->data = (uint8_t *) to;
 
-	if (make_transaction(req, resp) != 0) {
+	if (make_transaction(fd, req, resp) != 0) {
 		free(req);
 		free(resp);
 		return 1;

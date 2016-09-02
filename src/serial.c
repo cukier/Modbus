@@ -15,6 +15,13 @@ int serial_open_port(char *porta) {
 	return fd;
 }
 
+int serial_close_port(int fd) {
+
+	close(fd);
+
+	return 0;
+}
+
 int serial_set_port(int baud_rate, int fd) {
 	int ret;
 	struct termios options;
