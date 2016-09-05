@@ -13,7 +13,7 @@ static char *porta;
 static uint32_t baud;
 
 #ifndef TIME_OUT
-#define TIME_OUT	300
+#define TIME_OUT	5
 #endif
 
 int serial_init(char p[], uint32_t b) {
@@ -129,7 +129,7 @@ int serial_close_port(void) {
 
 int serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
 		uint16_t resp_size) {
-	int n, tries;
+	int n, tries, cont;
 
 	if (serial_open_port() == -1) {
 		serial_close_port();
@@ -138,15 +138,16 @@ int serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
 
 	tcflush(fd, TCIFLUSH);
 
-	if (write(fd, tx, msg_size) == -1)
-		return -1;
-
 	n = -1;
 	tries = TIME_OUT;
 
+	if (write(fd, tx, msg_size) == -1)
+		return -1;
+
 	while ((n == -1) && ((tries--) > 0)) {
 		n = read(fd, rx, resp_size);
-		usleep(1000);
+		usleep(2000000);
+		cont++;
 	}
 
 	serial_close_port();

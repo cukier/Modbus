@@ -10,8 +10,6 @@
 
 #include <stdint.h>
 
-#define REQUEST_SIZE	8
-
 typedef enum doors_enum {
 	NO_DOOR, SL1_DOOR, SL2_DOOR
 } door_t;
@@ -120,5 +118,7 @@ static const long wCRCTable[] = { 0X0000, 0XC0C1, 0XC181, 0X0140, 0XC301,
 
 extern uint8_t read_holding_registers(uint8_t dev_addr, uint16_t from,
 		uint16_t size, uint16_t *to);
+extern uint8_t write_single_register(uint8_t dev_addr, uint16_t register_addres,
+		uint16_t register_value);
 
 #endif /* MODBUS_H_ */

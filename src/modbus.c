@@ -51,6 +51,7 @@ uint8_t make_request(uint8_t dev_addr, uint16_t from, uint16_t size,
 	case READ_COILS_COMMAND:
 	case READ_DISCRETE_INPUT_COMMAND:
 	case READ_HOLDING_REGISTERS_COMMAND:
+	case WRITE_SINGLE_REGISTER_COMMAND:
 		crc = CRC16(req, 6);
 		req[6] = make8(crc, 0);
 		req[7] = make8(crc, 1);
@@ -147,11 +148,15 @@ uint8_t make_transaction(modbus_request_t *request, modbus_response_t *response)
 			resp_size = (size_t) (request->size / 8 + 5);
 		else
 			resp_size = (size_t) (request->size / 8 + 6);
-		req_size = REQUEST_SIZE;
+		req_size = 8;
 		break;
 	case READ_HOLDING_REGISTERS_COMMAND:
 		resp_size = (size_t) (request->size << 1) + 5;
-		req_size = REQUEST_SIZE;
+		req_size = 8;
+		break;
+	case WRITE_SINGLE_REGISTER_COMMAND:
+		resp_size = 8;
+		req_size = 8;
 		break;
 	case WRITE_MULTIPLE_REGISTERS_COMMAND:
 		resp_size = (size_t) 6;
@@ -229,8 +234,8 @@ uint8_t read_holding_registers(uint8_t dev_addr, uint16_t from, uint16_t size,
 	free(req);
 
 	if (r != 0) {
-		free(req);
-		free(resp->data);
+		if (resp->data != NULL)
+			free(resp->data);
 		free(resp);
 		return r;
 	}
@@ -241,6 +246,48 @@ uint8_t read_holding_registers(uint8_t dev_addr, uint16_t from, uint16_t size,
 
 	free(resp->data);
 	free(resp);
+
+	return 0;
+}
+
+uint8_t write_single_register(uint8_t dev_addr, uint16_t register_addres,
+		uint16_t register_value) {
+	modbus_response_t *resp;
+	modbus_request_t *req;
+	int r;
+//	uint16_t cont;
+
+	req = NULL;
+	req = (modbus_request_t *) malloc((size_t) (sizeof(modbus_request_t)));
+	resp = NULL;
+	resp = (modbus_response_t *) malloc((size_t) (sizeof(modbus_response_t)));
+
+	if (req == NULL || resp == NULL) {
+		free(req->data);
+		free(req);
+		free(resp->data);
+		free(resp);
+		return 1;
+	}
+
+	req->address = dev_addr;
+	req->start_address = register_addres;
+	req->size = register_value;
+	req->function = WRITE_SINGLE_REGISTER_COMMAND;
+	r = make_transaction(req, resp);
+	free(req);
+
+	if (r != 0) {
+		free(req);
+		free(resp->data);
+		free(resp);
+		return r;
+	}
+
+	free(resp->data);
+	free(resp);
+
+	return 0;
 
 	return 0;
 }

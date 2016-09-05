@@ -8,30 +8,60 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+
 #include "modbus.h"
 #include "serial.h"
 
 #define MEM_SIZE	200
 #define STEP		50
 #define	START_R		0
-#define QTD_R		12
+#define QTD_R		10
 #define START_W		0
 #define QTD_W		10
 #define END_PLC		64
 
-int main(int argc, char **argv) {
-
+int init(char *m_porta, uint32_t baud_rate) {
 	int r;
-	char porta[] = "/dev/ttyS1";
-	uint16_t *mem, cont;
 
 	r = -1;
-	r = serial_init(porta, 19200);
+	r = serial_init(m_porta, baud_rate);
 
 	if (r == -1) {
-		fprintf(stderr, "%s nao existe!\n", porta);
+		fprintf(stderr, "%s nao existe!\n", m_porta);
 		return -1;
 	}
+
+	return 0;
+}
+
+int read_plc(uint16_t *to) {
+	int r;
+	uint16_t cont;
+
+	r = -1;
+	r = read_holding_registers(END_PLC, START_R, QTD_R, to);
+
+	if (r != 0) {
+		fprintf(stderr, "Erro nr %u\n", r);
+		return -1;
+	}
+
+	for (cont = 0; cont < QTD_R; ++cont) {
+		if (!(cont % 8) && cont != 0)
+			printf("\n");
+		printf("0x%04X ", to[cont]);
+	}
+	printf("\n");
+
+	return 0;
+}
+
+int main(int argc, char **argv) {
+
+	char porta[] = "/dev/ttyS9";
+	uint16_t *mem;
+
+	init(porta, 19200);
 
 	printf("Porta aberta %s\nPeruntando...\n", porta);
 	mem = NULL;
@@ -42,19 +72,10 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
-	r = read_holding_registers(END_PLC, START_R, QTD_R, mem);
+	read_plc(mem);
 
-	if (r != 0) {
-		fprintf(stderr, "Erro nr %u\n", r);
-		return -1;
-	}
-
-	for (cont = 0; cont < QTD_R; ++cont) {
-		if (!(cont % 8) && cont != 0)
-			printf("\n");
-		printf("0x%04X ", mem[cont]);
-	}
-	printf("\n");
+//	r = -1;
+//	r = write_single_register(END_PLC, 0, 1);
 
 	return 0;
 }
