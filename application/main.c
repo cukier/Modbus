@@ -19,7 +19,6 @@
 #define QTD_W		10
 #define END_PLC		64
 
-
 int init(char *m_porta, uint32_t baud_rate) {
 	int r;
 
@@ -42,7 +41,7 @@ int read_plc(uint16_t *to) {
 	r = read_holding_registers(END_PLC, START_R, QTD_R, to);
 
 	if (r != 0) {
-		fprintf(stderr, "Erro nr %u\n", r);
+		fprintf(stderr, "Erro nr %u leitura\n", r);
 		return -1;
 	}
 
@@ -52,6 +51,20 @@ int read_plc(uint16_t *to) {
 		printf("0x%04X ", to[cont]);
 	}
 	printf("\n");
+
+	return 0;
+}
+
+int write_plc(uint16_t *from, size_t f_size) {
+	int r;
+
+	r = -1;
+	r = write_single_register(END_PLC, START_W, QTD_W);
+
+	if (r != 0) {
+		fprintf(stderr, "Erro nr %u escrita\n", r);
+		return -1;
+	}
 
 	return 0;
 }
@@ -73,6 +86,8 @@ int main(int argc, char **argv) {
 	}
 
 	read_plc(mem);
+	write_plc(NULL, 0);
+	serial_close();
 
 //	r = -1;
 //	r = write_single_register(END_PLC, 0, 1);

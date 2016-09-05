@@ -8,6 +8,14 @@
 #include <string.h>
 #include "serial.h"
 
+#ifndef TRIES
+#define TRIES	1000
+#endif
+
+static int fd;
+static char *porta;
+static uint32_t baud_rate;
+
 int u8_strcpy(uint8_t *dest, const uint8_t *src, size_t u8size, size_t offset) {
 	size_t cont;
 
@@ -17,14 +25,6 @@ int u8_strcpy(uint8_t *dest, const uint8_t *src, size_t u8size, size_t offset) {
 
 	return 0;
 }
-
-static int fd;
-static char *porta;
-static uint32_t baud_rate;
-
-#ifndef TRIES
-#define TRIES	1000
-#endif
 
 int serial_init(char p[], uint32_t b) {
 
@@ -129,12 +129,18 @@ int serial_open_port(void) {
 int serial_close_port(void) {
 	int r = -1;
 
-	free(porta);
 	r = close(fd);
 	fd = -1;
-	baud_rate = 0;
 
 	return r;
+}
+
+int serial_close(void) {
+
+	free(porta);
+	baud_rate = 0;
+	return serial_close_port();
+
 }
 
 size_t serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
