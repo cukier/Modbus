@@ -85,12 +85,13 @@ int main(int argc, char **argv) {
 		return -1;
 	}
 
-	read_plc(mem);
+//	read_plc(mem);
 	write_plc(NULL, 0);
 	serial_close();
 
 //	r = -1;
 //	r = write_single_register(END_PLC, 0, 1);
+	free(mem);
 
 	return 0;
 }

@@ -85,6 +85,7 @@ uint8_t check_CRC(uint8_t *resp, modbus_command_t command) {
 	case READ_DISCRETE_INPUT_COMMAND:
 		ar_size = resp[2] + 3;
 		break;
+	case WRITE_SINGLE_REGISTER_COMMAND:
 	case WRITE_MULTIPLE_REGISTERS_COMMAND:
 		ar_size = 6;
 		break;
@@ -254,8 +255,7 @@ uint8_t write_single_register(uint8_t dev_addr, uint16_t register_addres,
 		uint16_t register_value) {
 	modbus_response_t *resp;
 	modbus_request_t *req;
-	int r;
-//	uint16_t cont;
+	uint8_t r;
 
 	req = NULL;
 	req = (modbus_request_t *) malloc((size_t) (sizeof(modbus_request_t)));
@@ -278,16 +278,17 @@ uint8_t write_single_register(uint8_t dev_addr, uint16_t register_addres,
 	free(req);
 
 	if (r != 0) {
-		free(req);
-		free(resp->data);
+		if (resp->data != NULL)
+			free(resp->data);
+
 		free(resp);
+		free(req);
+
 		return r;
 	}
 
 	free(resp->data);
 	free(resp);
-
-	return 0;
 
 	return 0;
 }

@@ -168,7 +168,7 @@ size_t serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
 	ptr = NULL;
 	m_size = 0;
 	while ((m_size != resp_size) && ((m_tries--) > 0)) {
-		usleep(100); //usleep(time);
+		usleep(100);
 		n = read(fd, rx, resp_size);
 		if (n != -1 && n > 0) {
 			m_size += n;
