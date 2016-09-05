@@ -5,24 +5,39 @@
 #include <errno.h>
 #include <termios.h>
 #include <stdlib.h>
+#include <string.h>
 #include "serial.h"
 
-int serial_open_port(char *porta) {
-	int fd;
+static int fd;
+static char *porta;
+static uint32_t baud;
 
-	fd = open(porta, O_RDWR | O_NOCTTY | O_NDELAY);
+#ifndef TIME_OUT
+#define TIME_OUT	300
+#endif
 
-	return fd;
-}
+int serial_init(char p[], uint32_t b) {
 
-int serial_close_port(int fd) {
+	if (strlen(p) <= 0)
+		return -1;
 
-	close(fd);
+	if (b == 0)
+		return -1;
+
+	baud = b;
+	fd = -1;
+	porta = NULL;
+	porta = (char *) malloc(strlen(p) * sizeof(char));
+
+	if (porta == NULL)
+		return -1;
+
+	strcpy(porta, p);
 
 	return 0;
 }
 
-int serial_set_port(int baud_rate, int fd) {
+int serial_set_port(uint32_t baud_rate) {
 	int ret;
 	struct termios options;
 	speed_t speed;
@@ -83,20 +98,62 @@ int serial_set_port(int baud_rate, int fd) {
 	return 0;
 }
 
-int serial_transaction(int fd, uint8_t *tx, uint8_t *rx, int msg_size,
-		int resp_size) {
-	int n = -1, tries = 1000;
+int serial_open_port(void) {
 
-	tcflush(fd, TCIFLUSH);
-	write(fd, tx, msg_size);
+	if (strlen(porta) > 4) {
+		fd = open(porta, O_RDWR | O_NOCTTY | O_NDELAY);
 
-	while (n == -1 && (tries--) > 0) {
-		n = read(fd, rx, resp_size);
-		usleep(500000);
+		if (fd == -1)
+			return -1;
+	} else
+		return -1;
+
+	if (baud != 0)
+		serial_set_port(baud);
+	else
+		return -1;
+
+	return 0;
+}
+
+int serial_close_port(void) {
+	int r = -1;
+
+	free(porta);
+	r = close(fd);
+	fd = -1;
+	baud = 0;
+
+	return r;
+}
+
+int serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
+		uint16_t resp_size) {
+	int n, tries;
+
+	if (serial_open_port() == -1) {
+		serial_close_port();
+		return -1;
 	}
 
-	if (n == -1)
+	tcflush(fd, TCIFLUSH);
+
+	if (write(fd, tx, msg_size) == -1)
 		return -1;
+
+	n = -1;
+	tries = TIME_OUT;
+
+	while ((n == -1) && ((tries--) > 0)) {
+		n = read(fd, rx, resp_size);
+		usleep(1000);
+	}
+
+	serial_close_port();
+
+	if (n == -1) {
+		return -1;
+	}
 
 	return n;
 }

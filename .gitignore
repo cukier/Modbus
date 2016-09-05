@@ -1,6 +1,44 @@
-*.pydevproject
+
+# Created by https://www.gitignore.io/api/linux,windows,eclipse,c,c++,kicad,eagle,java
+
+### Linux ###
+*~
+
+# temporary files which can be created if a process still has a handle open of a deleted file
+.fuse_hidden*
+
+# KDE directory preferences
+.directory
+
+# Linux trash folder which might appear on any partition or disk
+.Trash-*
+
+
+### Windows ###
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+# Folder config file
+Desktop.ini
+
+# Recycle Bin used on file shares
+$RECYCLE.BIN/
+
+# Windows Installer files
+*.cab
+*.msi
+*.msm
+*.msp
+
+# Windows shortcuts
+*.lnk
+
+
+### Eclipse ###
+/Debug/
+
 .metadata
-.gradle
 bin/
 tmp/
 *.tmp
@@ -10,7 +48,7 @@ tmp/
 local.properties
 .settings/
 .loadpath
-Debug/
+.recommenders
 
 # Eclipse Core
 .project
@@ -21,7 +59,10 @@ Debug/
 # Locally stored "Eclipse launch configurations"
 *.launch
 
-# CDT-specific
+# PyDev specific (Python IDE for Eclipse)
+*.pydevproject
+
+# CDT-specific (C/C++ Development Tooling)
 .cproject
 
 # JDT-specific (Eclipse Java Development Tools)
@@ -30,11 +71,179 @@ Debug/
 # Java annotation processor (APT)
 .factorypath
 
-# PDT-specific
+# PDT-specific (PHP Development Tools)
 .buildpath
 
 # sbteclipse plugin
 .target
 
+# Tern plugin
+.tern-project
+
 # TeXlipse plugin
 .texlipse
+
+# STS (Spring Tool Suite)
+.springBeans
+
+# Code Recommenders
+.recommenders/
+
+
+### C ###
+# Prerequisites
+*.d
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Debug files
+*.dSYM/
+*.su
+
+
+### C++ ###
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+
+### KiCad ###
+# For PCBs designed using KiCad: http://www.kicad-pcb.org/
+
+# Temporary files
+*.000
+*.bak
+*.bck
+*.kicad_pcb-bak
+*~
+_autosave-*
+*.tmp
+
+# Netlist files (exported from Eeschema)
+*.net
+
+# Autorouter files (exported from Pcbnew)
+.dsn
+
+# Exported BOM files
+*.xml
+*.csv
+
+
+### Eagle ###
+# Ignore list for Eagle, a PCB layout tool
+
+# Backup files
+*.s#?
+*.b#?
+*.l#?
+
+# Eagle project file
+# It contains a serial number and references to the file structure
+# on your computer.
+# comment the following line if you want to have your project file included.
+eagle.epf
+
+# Autorouter files
+*.pro
+*.job
+
+# CAM files
+*.$$$
+*.cmp
+*.ly2
+*.l15
+*.sol
+*.plc
+*.stc
+*.sts
+*.crc
+*.crs
+
+*.dri
+*.drl
+*.gpi
+*.pls
+
+*.drd
+*.drd.*
+
+*.info
+
+*.eps
+
+# file locks introduced since 7.x
+*.lck
+
+
+
+### Java ###
+*.class
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Package Files #
+*.jar
+*.war
+*.ear
+
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*

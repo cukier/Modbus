@@ -118,7 +118,7 @@ static const long wCRCTable[] = { 0X0000, 0XC0C1, 0XC181, 0X0140, 0XC301,
 		0X8C41, 0X4400, 0X84C1, 0X8581, 0X4540, 0X8701, 0X47C0, 0X4680, 0X8641,
 		0X8201, 0X42C0, 0X4380, 0X8341, 0X4100, 0X81C1, 0X8081, 0X4040 };
 
-extern uint8_t read_holding_registers(int fd, uint8_t dev_addr, uint16_t from,
+extern uint8_t read_holding_registers(uint8_t dev_addr, uint16_t from,
 		uint16_t size, uint16_t *to);
 
 #endif /* MODBUS_H_ */

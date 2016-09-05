@@ -22,7 +22,7 @@ uint8_t make8(uint32_t var, uint8_t offset) {
 	return (uint8_t) (((var >> (offset * 8)) & 0xff));
 }
 
-uint8_t CRC16(uint8_t *nData, uint16_t wLength) {
+uint16_t CRC16(uint8_t *nData, uint16_t wLength) {
 	uint8_t nTemp;
 	uint16_t wCRCWord = 0xFFFF;
 
@@ -126,8 +126,7 @@ uint8_t mount_modbus_response(modbus_response_t *response, uint8_t *resp) {
 	return 0;
 }
 
-uint8_t make_transaction(int fd, modbus_request_t *request,
-		modbus_response_t *response) {
+uint8_t make_transaction(modbus_request_t *request, modbus_response_t *response) {
 	uint8_t *req, *resp, resul;
 	uint16_t resp_size, req_size;
 
@@ -174,7 +173,7 @@ uint8_t make_transaction(int fd, modbus_request_t *request,
 		return 1;
 	}
 
-	resul = serial_transaction(fd, req, resp, req_size, resp_size);
+	resul = serial_transaction(req, resp, req_size, resp_size);
 	free(req);
 
 	if (resul != 0) {
@@ -196,8 +195,8 @@ uint8_t make_transaction(int fd, modbus_request_t *request,
 	return 0;
 }
 
-uint8_t read_holding_registers(int fd, uint8_t dev_addr, uint16_t from,
-		uint16_t size, uint16_t *to) {
+uint8_t read_holding_registers(uint8_t dev_addr, uint16_t from, uint16_t size,
+		uint16_t *to) {
 	modbus_response_t *resp;
 	modbus_request_t *req;
 
@@ -220,7 +219,7 @@ uint8_t read_holding_registers(int fd, uint8_t dev_addr, uint16_t from,
 	req->function = READ_HOLDING_REGISTERS_COMMAND;
 	resp->data = (uint8_t *) to;
 
-	if (make_transaction(fd, req, resp) != 0) {
+	if (make_transaction(req, resp) != 0) {
 		free(req);
 		free(resp);
 		return 1;
