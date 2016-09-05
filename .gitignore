@@ -93,6 +93,7 @@ local.properties
 ### C ###
 # Prerequisites
 *.d
+*.stackdump
 
 # Object files
 *.o

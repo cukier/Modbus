@@ -52,7 +52,7 @@ int main(int argc, char **argv) {
 	for (cont = 0; cont < QTD_R; ++cont) {
 		if (!(cont % 8) && cont != 0)
 			printf("\n");
-		printf("0x%02X ", mem[cont]);
+		printf("0x%04X ", mem[cont]);
 	}
 	printf("\n");
 

@@ -110,18 +110,24 @@ uint8_t check_CRC(uint8_t *resp, modbus_command_t command) {
 }
 
 uint8_t mount_modbus_response(modbus_response_t *response, uint8_t *resp) {
-	int cont, size;
-
-	size = resp[2];
+	int cont;
 
 	response->address = resp[0];
 	response->function = resp[1];
-	response->response_size = size;
+	response->response_size = resp[2];
 
-	for (cont = 0; cont < size; ++cont)
+	response->data = NULL;
+	response->data = (uint8_t *) malloc(
+			response->response_size * sizeof(uint8_t));
+
+	if (response->data == NULL)
+		return -1;
+
+	for (cont = 0; cont < response->response_size; ++cont)
 		response->data[cont] = resp[cont + 3];
 
-	response->crc = make16(resp[size + 4], resp[size + 3]);
+	response->crc = make16(resp[response->response_size + 4],
+			resp[response->response_size + 3]);
 
 	return 0;
 }
@@ -170,27 +176,27 @@ uint8_t make_transaction(modbus_request_t *request, modbus_response_t *response)
 	if (resp == NULL) {
 		free(req);
 		free(resp);
-		return 1;
+		return 2;
 	}
 
 	resul = serial_transaction(req, resp, req_size, resp_size);
 	free(req);
 
-	if (resul != 0) {
+	if (resul != resp_size) {
 		free(resp);
-		return resul;
+		return 3;
 	}
 
 	if (!check_CRC(resp, request->function)) {
 		free(resp);
-		return 2;
+		return 4;
 	}
 
 	resul = mount_modbus_response(response, resp);
 	free(resp);
 
 	if (resul != 0)
-		return resul;
+		return 5;
 
 	return 0;
 }
@@ -199,6 +205,8 @@ uint8_t read_holding_registers(uint8_t dev_addr, uint16_t from, uint16_t size,
 		uint16_t *to) {
 	modbus_response_t *resp;
 	modbus_request_t *req;
+	int r;
+	uint16_t cont;
 
 	req = NULL;
 	req = (modbus_request_t *) malloc((size_t) (sizeof(modbus_request_t)));
@@ -217,15 +225,21 @@ uint8_t read_holding_registers(uint8_t dev_addr, uint16_t from, uint16_t size,
 	req->start_address = from;
 	req->size = size;
 	req->function = READ_HOLDING_REGISTERS_COMMAND;
-	resp->data = (uint8_t *) to;
+	r = make_transaction(req, resp);
+	free(req);
 
-	if (make_transaction(req, resp) != 0) {
+	if (r != 0) {
 		free(req);
+		free(resp->data);
 		free(resp);
-		return 1;
+		return r;
 	}
 
-	free(req);
+	for (cont = 0; cont < size; ++cont) {
+		to[cont] = make16(resp->data[2 * cont], resp->data[2 * cont + 1]);
+	}
+
+	free(resp->data);
 	free(resp);
 
 	return 0;
