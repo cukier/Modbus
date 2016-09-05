@@ -8,12 +8,22 @@
 #include <string.h>
 #include "serial.h"
 
+int u8_strcpy(uint8_t *dest, const uint8_t *src, size_t u8size, size_t offset) {
+	size_t cont;
+
+	for (cont = 0; cont < u8size; ++cont) {
+		dest[cont + offset] = src[cont];
+	}
+
+	return 0;
+}
+
 static int fd;
 static char *porta;
-static uint32_t baud;
+static uint32_t baud_rate;
 
-#ifndef TIME_OUT
-#define TIME_OUT	5
+#ifndef TRIES
+#define TRIES	1000
 #endif
 
 int serial_init(char p[], uint32_t b) {
@@ -24,7 +34,7 @@ int serial_init(char p[], uint32_t b) {
 	if (b == 0)
 		return -1;
 
-	baud = b;
+	baud_rate = b;
 	fd = -1;
 	porta = NULL;
 	porta = (char *) malloc(strlen(p) * sizeof(char));
@@ -108,8 +118,8 @@ int serial_open_port(void) {
 	} else
 		return -1;
 
-	if (baud != 0)
-		serial_set_port(baud);
+	if (baud_rate != 0)
+		serial_set_port(baud_rate);
 	else
 		return -1;
 
@@ -122,39 +132,60 @@ int serial_close_port(void) {
 	free(porta);
 	r = close(fd);
 	fd = -1;
-	baud = 0;
+	baud_rate = 0;
 
 	return r;
 }
 
-int serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
+size_t serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
 		uint16_t resp_size) {
-	int n, tries, cont;
+	int n, m_tries, cont;
+	size_t m_size;
+	uint8_t *ptr;
 
 	if (serial_open_port() == -1) {
 		serial_close_port();
 		return -1;
 	}
 
-	tcflush(fd, TCIFLUSH);
-
 	n = -1;
-	tries = TIME_OUT;
+	m_tries = TRIES;
 
+	tcflush(fd, TCIFLUSH);
 	if (write(fd, tx, msg_size) == -1)
 		return -1;
 
-	while ((n == -1) && ((tries--) > 0)) {
+#ifdef TIME_FRAME
+	usleep(TIME_FRAME);
+#endif
+	cont = 0;
+	ptr = NULL;
+	m_size = 0;
+	while ((m_size != resp_size) && ((m_tries--) > 0)) {
+		usleep(100); //usleep(time);
 		n = read(fd, rx, resp_size);
-		usleep(2000000);
-		cont++;
+		if (n != -1 && n > 0) {
+			m_size += n;
+			ptr = (uint8_t *) realloc(ptr, m_size * sizeof(uint8_t));
+
+			if (ptr == NULL)
+				break;
+
+			u8_strcpy(ptr, rx, n, (m_size - n));
+			cont++;
+		}
 	}
 
 	serial_close_port();
+
+	if (m_size > 0)
+		u8_strcpy(rx, ptr, m_size, 0);
+
+	free(ptr);
 
 	if (n == -1) {
 		return -1;
 	}
 
-	return n;
+	return m_size;
 }

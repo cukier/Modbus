@@ -10,10 +10,11 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stddef.h>
 
 extern int serial_init(char p[], uint32_t b);
 extern int serial_set_port(uint32_t baud_rate);
-extern int serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
+extern size_t serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
 		uint16_t resp_size);
 
 #endif /* SERIAL_H_ */

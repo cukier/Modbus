@@ -8,17 +8,17 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-
 #include "modbus.h"
 #include "serial.h"
 
 #define MEM_SIZE	200
 #define STEP		50
 #define	START_R		0
-#define QTD_R		10
+#define QTD_R		120
 #define START_W		0
 #define QTD_W		10
 #define END_PLC		64
+
 
 int init(char *m_porta, uint32_t baud_rate) {
 	int r;
