@@ -120,5 +120,7 @@ extern uint8_t read_holding_registers(uint8_t dev_addr, uint16_t from,
 		uint16_t size, uint16_t *to);
 extern uint8_t write_single_register(uint8_t dev_addr, uint16_t register_addres,
 		uint16_t register_value);
+extern uint8_t write_multiple_registers(uint8_t address,
+		uint16_t register_address, uint16_t size, uint16_t *data);
 
 #endif /* MODBUS_H_ */

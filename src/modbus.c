@@ -251,7 +251,7 @@ uint8_t read_holding_registers(uint8_t dev_addr, uint16_t from, uint16_t size,
 	return 0;
 }
 
-uint8_t write_single_register(uint8_t dev_addr, uint16_t register_addres,
+uint8_t write_single_register(uint8_t dev_addr, uint16_t register_address,
 		uint16_t register_value) {
 	modbus_response_t *resp;
 	modbus_request_t *req;
@@ -271,7 +271,7 @@ uint8_t write_single_register(uint8_t dev_addr, uint16_t register_addres,
 	}
 
 	req->address = dev_addr;
-	req->start_address = register_addres;
+	req->start_address = register_address;
 	req->size = register_value;
 	req->function = WRITE_SINGLE_REGISTER_COMMAND;
 	r = make_transaction(req, resp);
@@ -289,6 +289,51 @@ uint8_t write_single_register(uint8_t dev_addr, uint16_t register_addres,
 
 	free(resp->data);
 	free(resp);
+
+	return 0;
+}
+
+uint8_t write_multiple_registers(uint8_t dev_addr, uint16_t register_address,
+		uint16_t register_quantity, uint16_t *data) {
+	modbus_response_t *resp;
+	modbus_request_t *req;
+	uint8_t r;
+	uint16_t cont;
+
+	req = NULL;
+	req = (modbus_request_t *) malloc((size_t) (sizeof(modbus_request_t)));
+	resp = NULL;
+	resp = (modbus_response_t *) malloc((size_t) (sizeof(modbus_response_t)));
+
+	if (req == NULL || resp == NULL) {
+		free(req->data);
+		free(req);
+		free(resp->data);
+		free(resp);
+		return 1;
+	}
+
+	req->address = dev_addr;
+	req->start_address = register_address;
+	req->size = register_quantity;
+	req->function = WRITE_MULTIPLE_REGISTERS_COMMAND;
+	req->byte_count = register_quantity << 1;
+	req->data = NULL;
+	req->data = (uint8_t *) malloc(req->byte_count * sizeof(uint8_t));
+
+	if (req->data == NULL) {
+		free(req);
+		free(resp);
+		return -1;
+	}
+
+	for (cont = 0; cont < register_quantity; ++cont) {
+		req->data[2 * cont] = make8((uint32_t) data[cont], 0);
+		req->data[2 * cont + 1] = make8((uint32_t) data[cont], 1);
+	}
+
+	r = make_transaction(req, resp);
+	free(req);
 
 	return 0;
 }
