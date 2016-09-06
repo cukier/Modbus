@@ -143,7 +143,7 @@ int serial_close(void) {
 
 }
 
-size_t serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
+int serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
 		uint16_t resp_size) {
 	int n, m_tries;
 	size_t m_size;
@@ -157,13 +157,14 @@ size_t serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
 	n = -1;
 	m_tries = TRIES;
 
+#ifdef TIME_FRAME
+	usleep(TIME_FRAME);
+#endif
+
 	tcflush(fd, TCIFLUSH);
 	if (write(fd, tx, msg_size) == -1)
 		return -1;
 
-#ifdef TIME_FRAME
-	usleep(TIME_FRAME);
-#endif
 	ptr = NULL;
 	m_size = 0;
 	while ((m_size != resp_size) && ((m_tries--) > 0)) {
@@ -173,8 +174,10 @@ size_t serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
 			m_size += n;
 			ptr = (uint8_t *) realloc(ptr, m_size * sizeof(uint8_t));
 
-			if (ptr == NULL)
-				break;
+			if (ptr == NULL) {
+				free(ptr);
+				return -1;
+			}
 
 			u8_strcpy(ptr, rx, n, (m_size - n));
 		}

@@ -19,7 +19,7 @@
 #define QTD_W		120
 #define END_PLC		64
 
-int show_array(uint16_t *ptr, uint16_t size) {
+void show_array(uint16_t *ptr, uint16_t size) {
 	uint16_t cont;
 
 	for (cont = 0; cont < size; ++cont) {
@@ -29,16 +29,11 @@ int show_array(uint16_t *ptr, uint16_t size) {
 	}
 	printf("\n");
 
-	return 0;
+	return;
 }
 
 int gen_pattern(uint8_t *ptr, uint16_t size) {
-	uint8_t cont, n;
-
-//	cont = (uint8_t) rand() & 0xFF;
-//	do {
-//		n = (uint8_t) rand() & 0xFF;
-//	} while (cont--);
+	uint16_t cont;
 
 	for (cont = 0; cont < size; ++cont) {
 		ptr[cont] = (uint8_t) rand() & 0xFF;
@@ -47,7 +42,7 @@ int gen_pattern(uint8_t *ptr, uint16_t size) {
 	return 0;
 }
 
-int init(char *m_porta, uint32_t baud_rate) {
+exception_t init(char *m_porta, uint32_t baud_rate) {
 	int r;
 
 	r = -1;
@@ -55,15 +50,15 @@ int init(char *m_porta, uint32_t baud_rate) {
 
 	if (r == -1) {
 		fprintf(stderr, "%s nao existe!\n", m_porta);
-		return -1;
+		return NO_SERIAL_PORT_EXCEPTION;
 	}
 
 	return 0;
 }
 
-int read_plc() {
-	int r;
-	uint16_t cont, *to;
+exception_t read_plc() {
+	exception_t r;
+	uint16_t *to;
 
 	to = NULL;
 	to = (uint16_t *) malloc(QTD_R * sizeof(uint16_t));
@@ -74,21 +69,21 @@ int read_plc() {
 	r = -1;
 	r = read_holding_registers(END_PLC, START_R, QTD_R, to);
 
-	if (r != 0) {
+	if (r != NO_EXCEPTION) {
 		free(to);
 		fprintf(stderr, "Erro nr %u leitura\n", r);
-		return -1;
+		return r;
 	}
 
 	show_array(to, QTD_R);
 	free(to);
 
-	return 0;
+	return NO_EXCEPTION;
 }
 
-int write_plc() {
-	uint16_t cont, *pattern;
-	int r;
+exception_t write_plc() {
+	uint16_t *pattern;
+	exception_t r;
 
 //		r = -1;
 //		r = write_single_register(END_PLC, START_W, QTD_W);
@@ -102,27 +97,32 @@ int write_plc() {
 	pattern = (uint16_t *) malloc(QTD_W * sizeof(uint16_t));
 
 	if (pattern == NULL)
-		return -1;
+		return OUT_OF_MEMORY_EXCEPTION;
 
 	gen_pattern((uint8_t *) pattern, 2 * QTD_W);
 	printf("Padrao gerado\n");
 	show_array(pattern, QTD_W);
-	r = write_multiple_registers(END_PLC, START_W, QTD_W, (uint8_t *) pattern);
+	r = write_multiple_registers(END_PLC, START_W, QTD_W, pattern);
 	free(pattern);
 
-	return 0;
+	return r;
 }
 
 int main(int argc, char **argv) {
 
-	char porta[] = "/dev/ttyS8";
+	char porta[] = "/dev/ttyS9";
+	char msg[20];
+	exception_t ex;
 
 	init(porta, 19200);
 
 	printf("Porta aberta %s\nPeruntando...\n", porta);
 
 //	read_plc();
-	write_plc();
+	ex = NO_EXCEPTION;
+	ex = write_plc();
+	parse_error(msg, ex);
+	printf("Escrevendo %s\n", msg);
 	serial_close();
 
 	return 0;

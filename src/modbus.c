@@ -14,6 +14,29 @@
 #include <string.h>
 #include <stdlib.h>
 
+void parse_error(char msg[], exception_t ex) {
+
+	switch (ex) {
+	case NO_EXCEPTION:
+		strcpy(msg, "Sucesso");
+		break;
+	case TIMEOUT_EXCEPTION:
+		strcpy(msg, "Time out");
+		break;
+	case OUT_OF_MEMORY_EXCEPTION:
+		strcpy(msg, "Out of memory");
+		break;
+	case CRC_EXCEPTION:
+		strcpy(msg, "Crc error");
+		break;
+	default:
+		strcpy(msg, "Unknown error");
+		break;
+	}
+
+	return;
+}
+
 uint16_t make16(uint8_t varhigh, uint8_t varlow) {
 	return (uint16_t) (varhigh & 0xff) * 0x100 + (varlow & 0xff);
 }
@@ -134,7 +157,8 @@ uint8_t mount_modbus_response(modbus_response_t *response, uint8_t *resp) {
 	return 0;
 }
 
-uint8_t make_transaction(modbus_request_t *request, modbus_response_t *response) {
+exception_t make_transaction(modbus_request_t *request,
+		modbus_response_t *response) {
 	uint8_t *req, *resp, resul;
 	uint16_t resp_size, req_size;
 
@@ -170,7 +194,7 @@ uint8_t make_transaction(modbus_request_t *request, modbus_response_t *response)
 
 	if (req == NULL) {
 		free(req);
-		return 1;
+		return OUT_OF_MEMORY_EXCEPTION;
 	}
 
 	make_request(request->address, request->start_address, request->size,
@@ -182,7 +206,7 @@ uint8_t make_transaction(modbus_request_t *request, modbus_response_t *response)
 	if (resp == NULL) {
 		free(req);
 		free(resp);
-		return 2;
+		return OUT_OF_MEMORY_EXCEPTION;
 	}
 
 	resul = serial_transaction(req, resp, req_size, resp_size);
@@ -190,28 +214,28 @@ uint8_t make_transaction(modbus_request_t *request, modbus_response_t *response)
 
 	if (resul != resp_size) {
 		free(resp);
-		return 3;
+		return TIMEOUT_EXCEPTION;
 	}
 
 	if (!check_CRC(resp, request->function)) {
 		free(resp);
-		return 4;
+		return CRC_EXCEPTION;
 	}
 
 	resul = mount_modbus_response(response, resp);
 	free(resp);
 
 	if (resul != 0)
-		return 5;
+		return OUT_OF_MEMORY_EXCEPTION;
 
 	return 0;
 }
 
-uint8_t read_holding_registers(uint8_t dev_addr, uint16_t from, uint16_t size,
-		uint16_t *to) {
+exception_t read_holding_registers(uint8_t dev_addr, uint16_t from,
+		uint16_t size, uint16_t *to) {
 	modbus_response_t *resp;
 	modbus_request_t *req;
-	int r;
+	exception_t r;
 	uint16_t cont;
 
 	req = NULL;
@@ -224,7 +248,7 @@ uint8_t read_holding_registers(uint8_t dev_addr, uint16_t from, uint16_t size,
 		free(req);
 		free(resp->data);
 		free(resp);
-		return 1;
+		return OUT_OF_MEMORY_EXCEPTION;
 	}
 
 	req->address = dev_addr;
@@ -234,7 +258,7 @@ uint8_t read_holding_registers(uint8_t dev_addr, uint16_t from, uint16_t size,
 	r = make_transaction(req, resp);
 	free(req);
 
-	if (r != 0) {
+	if (r != NO_EXCEPTION) {
 		if (resp->data != NULL)
 			free(resp->data);
 		free(resp);
@@ -251,11 +275,11 @@ uint8_t read_holding_registers(uint8_t dev_addr, uint16_t from, uint16_t size,
 	return 0;
 }
 
-uint8_t write_single_register(uint8_t dev_addr, uint16_t register_address,
+exception_t write_single_register(uint8_t dev_addr, uint16_t register_address,
 		uint16_t register_value) {
 	modbus_response_t *resp;
 	modbus_request_t *req;
-	uint8_t r;
+	exception_t r;
 
 	req = NULL;
 	req = (modbus_request_t *) malloc((size_t) (sizeof(modbus_request_t)));
@@ -267,7 +291,7 @@ uint8_t write_single_register(uint8_t dev_addr, uint16_t register_address,
 		free(req);
 		free(resp->data);
 		free(resp);
-		return 1;
+		return OUT_OF_MEMORY_EXCEPTION;
 	}
 
 	req->address = dev_addr;
@@ -277,7 +301,7 @@ uint8_t write_single_register(uint8_t dev_addr, uint16_t register_address,
 	r = make_transaction(req, resp);
 	free(req);
 
-	if (r != 0) {
+	if (r != NO_EXCEPTION) {
 		if (resp->data != NULL)
 			free(resp->data);
 
@@ -293,7 +317,7 @@ uint8_t write_single_register(uint8_t dev_addr, uint16_t register_address,
 	return 0;
 }
 
-uint8_t write_multiple_registers(uint8_t dev_addr, uint16_t register_address,
+exception_t write_multiple_registers(uint8_t dev_addr, uint16_t register_address,
 		uint16_t register_quantity, uint16_t *data) {
 	modbus_response_t *resp;
 	modbus_request_t *req;
@@ -310,7 +334,7 @@ uint8_t write_multiple_registers(uint8_t dev_addr, uint16_t register_address,
 		free(req);
 		free(resp->data);
 		free(resp);
-		return 1;
+		return OUT_OF_MEMORY_EXCEPTION;
 	}
 
 	req->address = dev_addr;
@@ -324,7 +348,7 @@ uint8_t write_multiple_registers(uint8_t dev_addr, uint16_t register_address,
 	if (req->data == NULL) {
 		free(req);
 		free(resp);
-		return -1;
+		return OUT_OF_MEMORY_EXCEPTION;
 	}
 
 	for (cont = 0; cont < register_quantity; ++cont) {
@@ -333,7 +357,8 @@ uint8_t write_multiple_registers(uint8_t dev_addr, uint16_t register_address,
 	}
 
 	r = make_transaction(req, resp);
+	free(req->data);
 	free(req);
 
-	return 0;
+	return r;
 }

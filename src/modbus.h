@@ -10,9 +10,13 @@
 
 #include <stdint.h>
 
-typedef enum doors_enum {
-	NO_DOOR, SL1_DOOR, SL2_DOOR
-} door_t;
+typedef enum exceptions {
+	NO_EXCEPTION,
+	TIMEOUT_EXCEPTION,
+	OUT_OF_MEMORY_EXCEPTION,
+	CRC_EXCEPTION,
+	NO_SERIAL_PORT_EXCEPTION
+} exception_t;
 
 typedef enum modbus_commands {
 	NO_COMMAND,
@@ -36,37 +40,6 @@ typedef enum modbus_commands {
 	READ_FIFO_QUEQUE_COMMAND,
 	READ_DEVICE_IDENT_COMMAND = 0x2B
 } modbus_command_t;
-
-typedef enum modbus_fields {
-	MODBUS_FIELDS_ADDRESS,
-	MODBUS_FIELDS_FUNCTION,
-	MODBUS_FIELDS_REGISTER_ADDRESS_H,
-	MODBUS_FIELDS_REGISTER_ADDRESS_L,
-	MODBUS_FIELDS_REGISTER_VALUE_H,
-	MODBUS_FIELDS_REGISTER_VALUE_L,
-	MODBUS_FIELDS_BYTE_COUNT
-} modbus_fields_t;
-
-typedef enum modbus_command_exception_code {
-	EXCEPTION_CODE_0,
-	EXCEPTION_CODE_1,
-	EXCEPTION_CODE_2,
-	EXCEPTION_CODE_3,
-	EXCEPTION_CODE_4
-} modbus_command_exception_code_t;
-
-typedef enum read_holding_registers_exceptions {
-	FUNCTION_CODE_NOT_SUPPORTED_EXCEPTION = 0x01,
-	ADDRESS_EXCEPTION,
-	QUANTITY_OF_REGISTERS_EXCEPTION,
-	READ_MULTIPLE_REGISTER_EXCEPTION
-} read_holding_registers_exceptions_t;
-
-typedef enum write_single_register_exceptions {
-	OUTPUT_ADDRESS_EXCEPTION = 0x02,
-	OUTPUT_VALUE_EXCEPTION,
-	WRITE_SINGLE_OUTPUT_EXCEPTION
-} write_single_register_exceptions_t;
 
 typedef struct modbus_response {
 	uint8_t address;
@@ -116,11 +89,12 @@ static const long wCRCTable[] = { 0X0000, 0XC0C1, 0XC181, 0X0140, 0XC301,
 		0X8C41, 0X4400, 0X84C1, 0X8581, 0X4540, 0X8701, 0X47C0, 0X4680, 0X8641,
 		0X8201, 0X42C0, 0X4380, 0X8341, 0X4100, 0X81C1, 0X8081, 0X4040 };
 
-extern uint8_t read_holding_registers(uint8_t dev_addr, uint16_t from,
+extern void parse_error(char msg[], exception_t ex);
+extern exception_t read_holding_registers(uint8_t dev_addr, uint16_t from,
 		uint16_t size, uint16_t *to);
-extern uint8_t write_single_register(uint8_t dev_addr, uint16_t register_addres,
-		uint16_t register_value);
-extern uint8_t write_multiple_registers(uint8_t address,
+extern exception_t write_single_register(uint8_t dev_addr,
+		uint16_t register_addres, uint16_t register_value);
+extern exception_t write_multiple_registers(uint8_t address,
 		uint16_t register_address, uint16_t size, uint16_t *data);
 
 #endif /* MODBUS_H_ */
