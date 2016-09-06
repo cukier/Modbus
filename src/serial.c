@@ -145,7 +145,7 @@ int serial_close(void) {
 
 size_t serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
 		uint16_t resp_size) {
-	int n, m_tries, cont;
+	int n, m_tries;
 	size_t m_size;
 	uint8_t *ptr;
 
@@ -164,7 +164,6 @@ size_t serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
 #ifdef TIME_FRAME
 	usleep(TIME_FRAME);
 #endif
-	cont = 0;
 	ptr = NULL;
 	m_size = 0;
 	while ((m_size != resp_size) && ((m_tries--) > 0)) {
@@ -178,7 +177,6 @@ size_t serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
 				break;
 
 			u8_strcpy(ptr, rx, n, (m_size - n));
-			cont++;
 		}
 	}
 

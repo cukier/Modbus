@@ -15,8 +15,8 @@
 #define STEP		50
 #define	START_R		0
 #define QTD_R		120
-#define START_W		0
-#define QTD_W		10
+#define START_W		15
+#define QTD_W		120
 #define END_PLC		64
 
 int show_array(uint16_t *ptr, uint16_t size) {
@@ -109,6 +109,8 @@ int write_plc() {
 	show_array(pattern, QTD_W);
 	r = write_multiple_registers(END_PLC, START_W, QTD_W, (uint8_t *) pattern);
 	free(pattern);
+
+	return 0;
 }
 
 int main(int argc, char **argv) {
