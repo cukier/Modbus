@@ -143,7 +143,7 @@ int serial_close(void) {
 
 }
 
-int serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
+size_t serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
 		uint16_t resp_size) {
 	int n, m_tries;
 	size_t m_size;
@@ -151,7 +151,7 @@ int serial_transaction(uint8_t *tx, uint8_t *rx, uint16_t msg_size,
 
 	if (serial_open_port() == -1) {
 		serial_close_port();
-		return -1;
+		return 0;
 	}
 
 	n = -1;

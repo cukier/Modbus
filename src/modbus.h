@@ -90,11 +90,11 @@ static const long wCRCTable[] = { 0X0000, 0XC0C1, 0XC181, 0X0140, 0XC301,
 		0X8201, 0X42C0, 0X4380, 0X8341, 0X4100, 0X81C1, 0X8081, 0X4040 };
 
 extern void parse_error(char msg[], exception_t ex);
-extern exception_t read_holding_registers(uint8_t dev_addr, uint16_t from,
+extern exception_t mb_read_holding_registers(uint8_t dev_addr, uint16_t from,
 		uint16_t size, uint16_t *to);
-extern exception_t write_single_register(uint8_t dev_addr,
+extern exception_t mb_write_single_register(uint8_t dev_addr,
 		uint16_t register_addres, uint16_t register_value);
-extern exception_t write_multiple_registers(uint8_t address,
+extern exception_t mb_write_multiple_registers(uint8_t address,
 		uint16_t register_address, uint16_t size, uint16_t *data);
 
 #endif /* MODBUS_H_ */

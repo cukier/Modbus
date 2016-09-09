@@ -67,7 +67,7 @@ exception_t read_plc() {
 		return -1;
 
 	r = -1;
-	r = read_holding_registers(END_PLC, START_R, QTD_R, to);
+	r = mb_read_holding_registers(END_PLC, START_R, QTD_R, to);
 
 	if (r != NO_EXCEPTION) {
 		free(to);
@@ -102,7 +102,7 @@ exception_t write_plc() {
 	gen_pattern((uint8_t *) pattern, 2 * QTD_W);
 	printf("Padrao gerado\n");
 	show_array(pattern, QTD_W);
-	r = write_multiple_registers(END_PLC, START_W, QTD_W, pattern);
+	r = mb_write_multiple_registers(END_PLC, START_W, QTD_W, pattern);
 	free(pattern);
 
 	return r;
@@ -118,9 +118,9 @@ int main(int argc, char **argv) {
 
 	printf("Porta aberta %s\nPeruntando...\n", porta);
 
-//	read_plc();
+	read_plc();
 	ex = NO_EXCEPTION;
-	ex = write_plc();
+//	ex = write_plc();
 	parse_error(msg, ex);
 	printf("Escrevendo %s\n", msg);
 	serial_close();

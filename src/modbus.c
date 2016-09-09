@@ -13,6 +13,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 void parse_error(char msg[], exception_t ex) {
 
@@ -95,7 +96,7 @@ uint8_t make_request(uint8_t dev_addr, uint16_t from, uint16_t size,
 		break;
 	}
 
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 uint8_t check_CRC(uint8_t *resp, modbus_command_t command) {
@@ -135,7 +136,7 @@ uint8_t check_CRC(uint8_t *resp, modbus_command_t command) {
 }
 
 uint8_t mount_modbus_response(modbus_response_t *response, uint8_t *resp) {
-	int cont;
+	uint16_t cont;
 
 	response->address = resp[0];
 	response->function = resp[1];
@@ -146,7 +147,7 @@ uint8_t mount_modbus_response(modbus_response_t *response, uint8_t *resp) {
 			response->response_size * sizeof(uint8_t));
 
 	if (response->data == NULL)
-		return -1;
+		return EXIT_FAILURE;
 
 	for (cont = 0; cont < response->response_size; ++cont)
 		response->data[cont] = resp[cont + 3];
@@ -154,7 +155,7 @@ uint8_t mount_modbus_response(modbus_response_t *response, uint8_t *resp) {
 	response->crc = make16(resp[response->response_size + 4],
 			resp[response->response_size + 3]);
 
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 exception_t make_transaction(modbus_request_t *request,
@@ -209,7 +210,7 @@ exception_t make_transaction(modbus_request_t *request,
 		return OUT_OF_MEMORY_EXCEPTION;
 	}
 
-	resul = serial_transaction(req, resp, req_size, resp_size);
+	resul = (uint8_t) serial_transaction(req, resp, req_size, resp_size);
 	free(req);
 
 	if (resul != resp_size) {
@@ -228,10 +229,10 @@ exception_t make_transaction(modbus_request_t *request,
 	if (resul != 0)
 		return OUT_OF_MEMORY_EXCEPTION;
 
-	return 0;
+	return NO_EXCEPTION;
 }
 
-exception_t read_holding_registers(uint8_t dev_addr, uint16_t from,
+exception_t mb_read_holding_registers(uint8_t dev_addr, uint16_t from,
 		uint16_t size, uint16_t *to) {
 	modbus_response_t *resp;
 	modbus_request_t *req;
@@ -272,11 +273,11 @@ exception_t read_holding_registers(uint8_t dev_addr, uint16_t from,
 	free(resp->data);
 	free(resp);
 
-	return 0;
+	return NO_EXCEPTION;
 }
 
-exception_t write_single_register(uint8_t dev_addr, uint16_t register_address,
-		uint16_t register_value) {
+exception_t mb_write_single_register(uint8_t dev_addr,
+		uint16_t register_address, uint16_t register_value) {
 	modbus_response_t *resp;
 	modbus_request_t *req;
 	exception_t r;
@@ -314,11 +315,11 @@ exception_t write_single_register(uint8_t dev_addr, uint16_t register_address,
 	free(resp->data);
 	free(resp);
 
-	return 0;
+	return NO_EXCEPTION;
 }
 
-exception_t write_multiple_registers(uint8_t dev_addr, uint16_t register_address,
-		uint16_t register_quantity, uint16_t *data) {
+exception_t mb_write_multiple_registers(uint8_t dev_addr,
+		uint16_t register_address, uint16_t register_quantity, uint16_t *data) {
 	modbus_response_t *resp;
 	modbus_request_t *req;
 	uint8_t r;
