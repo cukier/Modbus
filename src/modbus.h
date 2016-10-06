@@ -8,7 +8,8 @@
 #ifndef MODBUS_H_
 #define MODBUS_H_
 
-#include "logger.h"
+#include <stdint.h>
+#include <stdbool.h>
 
 #define RDA_TIMER_RESET					0
 #define RDA2_TIMER_RESET				0
@@ -33,19 +34,19 @@
 #endif
 
 #ifdef USE_UART1
-#define uc_set_timer_rda()			set_timer0(RDA_TIMER_RESET)
-#define uc_setup_timer_rda()		setup_timer_0(T0_INTERNAL|T0_DIV_8)
-#define uc_clear_rda_interrupt() 	clear_interrupt(INT_TIMER0)
-#define uc_turn_off_timer_rda()		setup_timer_0(T0_OFF)
-#define RDA_INTERRUPT				INT_TIMER0
+#define uc_set_timer_rda()				set_timer0(RDA_TIMER_RESET)
+#define uc_setup_timer_rda()			setup_timer_0(T0_INTERNAL|T0_DIV_8)
+#define uc_clear_rda_interrupt() 		clear_interrupt(INT_TIMER0)
+#define uc_turn_off_timer_rda()			setup_timer_0(T0_OFF)
+#define RDA_INTERRUPT					INT_TIMER0
 #endif
 
 #ifdef USE_UART2
-#define uc_set_timer_rda2()			set_timer1(RDA2_TIMER_RESET)
-#define uc_setup_timer_rda2()		setup_timer_1(T1_INTERNAL|T1_DIV_BY_8)
-#define uc_clear_rda2_interrupt() 	clear_interrupt(INT_TIMER1)
-#define uc_turn_off_timer_rda2()	setup_timer_1(T1_DISABLED)
-#define RDA2_INTERRUPT				INT_TIMER1
+#define uc_set_timer_rda2()				set_timer1(RDA2_TIMER_RESET)
+#define uc_setup_timer_rda2()			setup_timer_1(T1_INTERNAL|T1_DIV_BY_8)
+#define uc_clear_rda2_interrupt() 		clear_interrupt(INT_TIMER1)
+#define uc_turn_off_timer_rda2()		setup_timer_1(T1_DISABLED)
+#define RDA2_INTERRUPT					INT_TIMER1
 #endif
 
 typedef enum doors_enum {
@@ -107,24 +108,24 @@ typedef enum write_single_register_exceptions {
 } write_single_register_exceptions_t;
 
 typedef struct modbus_response {
-	int address;
-	int function;
-	int response_size;
-	int *data;
-	long crc;
+	uint8_t address;
+	uint8_t function;
+	uint8_t response_size;
+	uint8_t *data;
+	uint16_t crc;
 } modbus_rx_t;
 
 typedef struct modbus_request {
-	int address;
-	int function;
-	long start_address;
-	long size;
-	int byte_count;
-	int *data;
-	long crc;
+	uint8_t address;
+	uint8_t function;
+	uint16_t start_address;
+	uint16_t size;
+	uint8_t byte_count;
+	uint8_t *data;
+	uint16_t crc;
 } modbus_rq_t;
 
-static const long wCRCTable[] = { 0X0000, 0XC0C1, 0XC181, 0X0140, 0XC301,
+static const uint16_t wCRCTable[] = { 0X0000, 0XC0C1, 0XC181, 0X0140, 0XC301,
 		0X03C0, 0X0280, 0XC241, 0XC601, 0X06C0, 0X0780, 0XC741, 0X0500, 0XC5C1,
 		0XC481, 0X0440, 0XCC01, 0X0CC0, 0X0D80, 0XCD41, 0X0F00, 0XCFC1, 0XCE81,
 		0X0E40, 0X0A00, 0XCAC1, 0XCB81, 0X0B40, 0XC901, 0X09C0, 0X0880, 0XC841,
@@ -155,41 +156,64 @@ static const long wCRCTable[] = { 0X0000, 0XC0C1, 0XC181, 0X0140, 0XC301,
 		0X8201, 0X42C0, 0X4380, 0X8341, 0X4100, 0X81C1, 0X8081, 0X4040 };
 
 static short slave_respond;
-static long index_rda, index_rda2;
+static uint16_t index_rda, index_rda2;
 
-int buffer_rda[RDA_BUFFER_SIZE];
-int buffer_rda2[rda2_BUFFER_SIZE];
+uint8_t buffer_rda[RDA_BUFFER_SIZE];
+uint8_t buffer_rda2[rda2_BUFFER_SIZE];
 
-extern long swap_w(long word);
+
+#ifdef USE_UART1
 extern isr_rda();
+#if (SL1_TYPE == SL_MULTI_MASTER)
+extern void isr_rda_timer();
+#endif
+#endif
+#ifdef USE_UART2
 extern isr_rda2();
+#if (SL2_TYPE == SL_MULTI_MASTER)
+extern void isr_rda2_timer();
+#endif
+#endif
+
+extern uint16_t swap_w(uint16_t word);
+extern uint32_t get_dword(uint16_t address);
+extern uint8_t set_dword(uint16_t address, uint32_t value);
+extern uint16_t get_register(uint16_t address);
+extern uint8_t set_register(uint16_t address, uint16_t value);
+extern uint8_t get_byte(uint16_t address);
+extern uint8_t set_byte(uint16_t address, uint8_t value);
+extern bool get_bool(uint16_t address);
+extern bool set_bool(uint16_t address, bool value);
 extern exception_t slave_response(void);
-extern int modbus_init(void);
-extern int parse_error(exception_t error);
-extern long CRC16(int *nData, long wLength);
-extern make_request(int dev_addr, long from, long size, int byte_count,
-		int *data, modbus_command_t command, int *req);
-extern void flush_buffer(int *buffer, long *index);
-extern exception_t read_modbus_response(int *req, int *resp, door_t sl);
+extern uint8_t modbus_init(void);
+extern uint8_t parse_error(exception_t error, char *msg);
+extern uint16_t CRC16(uint8_t *nData, uint16_t wLength);
+extern uint8_t make_request(uint8_t dev_addr, uint16_t from, uint16_t size,
+		uint8_t byte_count, uint8_t *data, modbus_command_t command,
+		uint8_t *req);
+extern void flush_buffer(uint8_t *buffer, uint16_t *index);
+extern exception_t read_modbus_response(uint8_t *req, uint8_t *resp, door_t sl);
 extern exception_t mount_modbus_response(modbus_rx_t *modbus_response,
-		int *resp);
-extern short check_CRC(int *resp, modbus_command_t command);
-extern exception_t make_transaction(int dev_addr, long from, long size,
-		int byte_count, int *data, modbus_command_t command,
-		modbus_rx_t *modbus_response, door_t sl);
-extern int get_word_mem(modbus_rx_t *device, long *resp);
-extern exception_t transport(int dev_addr, long from, long size, int byte_count,
-		int *data, long *resp, modbus_command_t command, door_t sl);
-extern exception_t read_holding_registers(int dev_addr, long from, long size,
-		long *to, door_t sl);
-extern exception_t read_discrete_inputs(int dev_addr, long from, long size,
-		long *to, door_t sl);
-extern exception_t read_coils(int dev_addr, long from, long size, long *to,
-		door_t sl);
-extern exception_t send_modbus(int *data, long size);
-extern exception_t return_error(int dev_addr, modbus_command_t command,
+		uint8_t *resp);
+extern bool check_CRC(uint8_t *resp, modbus_command_t command);
+extern exception_t make_transaction(uint8_t dev_addr, uint16_t from,
+		uint16_t size, uint8_t byte_count, uint8_t *data,
+		modbus_command_t command, modbus_rx_t *modbus_response, door_t sl);
+extern uint8_t get_word_mem(modbus_rx_t *device, uint16_t *resp);
+extern uint8_t get_byte_mem(modbus_rx_t *device, uint16_t *resp);
+extern exception_t transport(uint8_t dev_addr, uint16_t from, uint16_t size,
+		uint8_t byte_count, uint8_t *data, uint16_t *resp,
+		modbus_command_t command, door_t sl);
+extern exception_t read_holding_registers(uint8_t dev_addr, uint16_t from,
+		uint16_t size, uint16_t *to, door_t sl);
+extern exception_t read_discrete_inputs(uint8_t dev_addr, uint16_t from,
+		uint16_t size, uint16_t *to, door_t sl);
+extern exception_t read_coils(uint8_t dev_addr, uint16_t from, uint16_t size,
+		uint16_t *to, door_t sl);
+extern exception_t send_modbus(uint8_t *data, uint16_t size);
+extern exception_t return_error(uint8_t dev_addr, modbus_command_t command,
 		modbus_command_exception_code_t error);
-extern exception_t write_multiple_registers(int dev_addr, long from, long size,
-		long byte_count, int *data, door_t sl);
+extern exception_t write_multiple_registers(uint8_t dev_addr, uint16_t from,
+		uint16_t size, uint16_t byte_count, uint8_t *data, door_t sl);
 
 #endif /* MODBUS_H_ */

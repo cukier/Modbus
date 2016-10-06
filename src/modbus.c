@@ -9,19 +9,8 @@
  */
 
 #include "modbus.h"
-#include "logger.h"
-#include "sdcard.h"
 #include <stdlib.h>
 #include <STDDEF.H>
-
-long swap_w(long word) {
-	long aux;
-
-	aux = (word & 0xFF00) >> 8;
-	aux |= (word & 0x00FF) << 8;
-
-	return aux;
-}
 
 #ifdef USE_UART1
 #use rs232(uart1, baud=UART1_BAUD_RATE, stream=sl1)
@@ -35,7 +24,7 @@ void isr_rda() {
 	index_rda = 0;
 }
 #if (SL1_TYPE == SL_MULTI_MASTER)
-#INT_TIMER0
+#uint8_t_TIMER0
 void isr_rda_timer() {
 	clear_interrupt(RDA_INTERRUPT);
 	index_rda = 0;
@@ -68,11 +57,102 @@ void isr_rda2_timer() {
 #endif
 #endif
 
+uint16_t swap_w(uint16_t word) {
+	uint16_t aux;
+
+	aux = (word & 0xFF00) >> 8;
+	aux |= (word & 0x00FF) << 8;
+
+	return aux;
+}
+
+uint32_t get_dword(uint16_t address) {
+	uint8_t addr = address * 2;
+	return make32(read_eeprom(addr), read_eeprom(addr + 1),
+			read_eeprom(addr + 2), read_eeprom(addr + 3));
+}
+
+uint8_t set_dword(uint16_t address, uint32_t value) {
+	uint8_t addr = address * 2;
+	write_eeprom(addr, make8(value, 3));
+	write_eeprom(addr + 1, make8(value, 2));
+	write_eeprom(addr + 2, make8(value, 1));
+	write_eeprom(addr + 3, make8(value, 0));
+	return 0;
+}
+
+uint16_t get_register(uint16_t address) {
+	uint16_t addr = address * 2;
+
+	return make16(read_eeprom(addr), read_eeprom(addr + 1));
+}
+
+uint8_t set_register(uint16_t address, uint16_t value) {
+	uint16_t addr = address * 2;
+
+	write_eeprom(addr, make8(value, 1));
+	write_eeprom(addr + 1, make8(value, 0));
+
+	return 0;
+}
+
+uint8_t get_byte(uint16_t address) {
+	uint16_t addr;
+
+	addr = (uint8_t) address / 2;
+
+	if (address % 2) {
+		addr++;
+	}
+
+	return read_eeprom(addr);
+}
+
+uint8_t set_byte(uint16_t address, uint8_t value) {
+	uint16_t addr;
+
+	addr = (uint8_t) address / 2;
+
+	if (address % 2) {
+		addr++;
+	}
+
+	write_eeprom(addr, value);
+
+	return 0;
+}
+
+bool get_bool(uint16_t address) {
+	uint8_t addr;
+
+	addr = (uint8_t) address / 8;
+
+	return (bool) read_eeprom(addr) & (1 << (address - addr));
+}
+
+bool set_bool(uint16_t address, bool value) {
+	uint8_t reg;
+	uint8_t addr;
+
+	addr = (uint8_t) address / 8;
+	reg = read_eeprom(addr);
+
+	if (value) {
+		reg |= (1 << (address - addr));
+	} else {
+		reg &= ~(1 << (address - addr));
+	}
+
+	write_eeprom(addr, value);
+
+	return FALSE;
+}
+
 exception_t slave_response() {
 	short rbt;
-	long cont, crc, register_value, register_address, b_count, size, m_index,
-			m_cmd;
-	int *resp, *buff;
+	uint16_t cont, crc, register_value, register_address, b_count, size,
+			m_index, aux;
+	uint8_t *resp, *buff, my_address;
 
 #ifdef USE_UART1
 #if (SL1_TYPE == SL_MULTI_MASTER)
@@ -89,6 +169,7 @@ exception_t slave_response() {
 
 	size = 0;
 	rbt = FALSE;
+	my_address = get_byte(ADDR_MY_B);
 	register_value = make16(buff[MODBUS_FIELDS_REGISTER_VALUE_H],
 			buff[MODBUS_FIELDS_REGISTER_VALUE_L]);
 	register_address = make16(buff[MODBUS_FIELDS_REGISTER_ADDRESS_H],
@@ -103,53 +184,51 @@ exception_t slave_response() {
 					|| m_index != 8) {
 				size = 5;
 				resp = NULL;
-				resp = (int *) malloc((size_t) (size * sizeof(int)));
+				resp = (uint8_t *) malloc((size_t) (size * sizeof(uint8_t)));
 
 				if (resp == NULL) {
 					free(resp);
 					return OUT_OF_MEMORY_EXCEPTION;
 				}
 
-				resp[0] = (int) my_address;
+				resp[0] = (uint8_t) my_address;
 				resp[1] = 0x83;
 				resp[2] = 0x03;
 				crc = CRC16(resp, 3);
 			} else if (register_value + register_address >= UINT16_MAX) {
 				size = 5;
 				resp = NULL;
-				resp = (int *) malloc(size);
+				resp = (uint8_t *) malloc((size_t) (size * sizeof(uint8_t)));
 
 				if (resp == NULL) {
 					free(resp);
 					return OUT_OF_MEMORY_EXCEPTION;
 				}
 
-				resp[0] = (int) my_address;
+				resp[0] = (uint8_t) my_address;
 				resp[1] = 0x83;
 				resp[2] = 0x02;
 				crc = CRC16(resp, 3);
 			} else {
 				size = (size_t)((register_value * 2) + 5);
 				resp = NULL;
-				resp = (int *) malloc(size);
+				resp = (uint8_t *) malloc(size);
 
 				if (resp == NULL) {
 					free(resp);
 					return OUT_OF_MEMORY_EXCEPTION;
 				}
 
-				resp[0] = (int) my_address;
+				resp[0] = (uint8_t) my_address;
 				resp[1] = READ_HOLDING_REGISTERS_COMMAND;
-				resp[2] = (int) register_value * 2;
-#ifdef DEBUG
-				DEBUG_DATA2("Requesicao de leitura por %lu registradores no end. %lu\n", register_value, register_address);
-#endif
+				resp[2] = (uint8_t) register_value * 2;
 
+				aux = 0;
 				for (cont = 0; cont < register_value; ++cont) {
-					resp[2 * cont + 3] = read_eeprom(
-							register_address + 2 * cont);
-					resp[2 * cont + 4] = read_eeprom(
-							register_address + 2 * cont + 1);
+					aux = get_register(cont + register_address);
+					resp[2 * cont + 3] = make8(aux, 1);
+					resp[2 * cont + 4] = make8(aux, 0);
+
 				}
 
 				crc = CRC16(resp, (register_value * 2) + 3);
@@ -161,34 +240,33 @@ exception_t slave_response() {
 
 		case WRITE_SINGLE_REGISTER_COMMAND:
 
-			if (register_value == 0 || register_value > 0x007D
-					|| m_index != 8) {
+			if (m_index != 8) {
 				size = 5;
 				resp = NULL;
-				resp = (int *) malloc((size_t) (size * sizeof(int)));
+				resp = (uint8_t *) malloc((size_t) (size * sizeof(uint8_t)));
 
 				if (resp == NULL) {
 					free(resp);
 					return OUT_OF_MEMORY_EXCEPTION;
 				}
 
-				resp[0] = (int) my_address;
+				resp[0] = (uint8_t) my_address;
 				resp[1] = 0x86;
 				resp[2] = 0x03;
 				crc = CRC16(resp, 3);
 				resp[4] = make8(crc, 1);
 				resp[5] = make8(crc, 0);
-			} else if (register_value + register_address >= UINT16_MAX) {
+			} else if (register_value + register_address >= 0x03F8) { //0x03F8 eh o tamanho da memoria do 46K22
 				size = 5;
 				resp = NULL;
-				resp = (int *) malloc(size);
+				resp = (uint8_t *) malloc(size);
 
 				if (resp == NULL) {
 					free(resp);
 					return OUT_OF_MEMORY_EXCEPTION;
 				}
 
-				resp[0] = (int) my_address;
+				resp[0] = (uint8_t) my_address;
 				resp[1] = 0x86;
 				resp[2] = 0x02;
 				crc = CRC16(resp, 3);
@@ -196,31 +274,27 @@ exception_t slave_response() {
 				resp[5] = make8(crc, 0);
 			} else {
 
-				size = (size_t)(8 * sizeof(int));
+				size = (size_t)(8 * sizeof(uint8_t));
 				resp = NULL;
-				resp = (int *) malloc(size);
+				resp = (uint8_t *) malloc(size);
 
 				if (resp == NULL) {
 					free(resp);
 					return OUT_OF_MEMORY_EXCEPTION;
 				}
 
-#ifdef DEBUG
-				DEBUG_DATA2("Requesicao de escrita (func 06) no endereco %05lu valor %05lu\n", register_address, register_value);
-#endif
+				if (register_address < 14 || register_address > 15) //protecao para versao
+					set_register(register_address, register_value);
 
-				write_eeprom(register_address, make8(register_value, 1));
-				write_eeprom(register_address + 1, make8(register_value, 0));
-
-				resp[0] = (int) my_address;
+				resp[0] = (uint8_t) my_address;
 				resp[1] = WRITE_SINGLE_REGISTER_COMMAND;
-				resp[2] = (int) make8(register_address, 1);
-				resp[3] = (int) make8(register_address, 0);
-				resp[4] = (int) make8(register_value, 1);
-				resp[5] = (int) make8(register_value, 0);
+				resp[2] = (uint8_t) make8(register_address, 1);
+				resp[3] = (uint8_t) make8(register_address, 0);
+				resp[4] = (uint8_t) make8(register_value, 1);
+				resp[5] = (uint8_t) make8(register_value, 0);
 				crc = CRC16(resp, 6);
-				resp[6] = (int) make8(crc, 1);
-				resp[7] = (int) make8(crc, 0);
+				resp[6] = (uint8_t) make8(crc, 1);
+				resp[7] = (uint8_t) make8(crc, 0);
 			}
 
 			break;
@@ -232,28 +306,28 @@ exception_t slave_response() {
 					|| m_index != (b_count + 9)) {
 				size = 5;
 				resp = NULL;
-				resp = (int *) malloc(size);
+				resp = (uint8_t *) malloc(size);
 
 				if (resp == NULL) {
 					free(resp);
 					return OUT_OF_MEMORY_EXCEPTION;
 				}
 
-				resp[0] = (int) my_address;
+				resp[0] = (uint8_t) my_address;
 				resp[1] = 0x90;
 				resp[2] = 0x03;
 				crc = CRC16(resp, 3);
-			} else if (register_value + register_address >= UINT16_MAX) {
+			} else if (register_value + register_address >= 0x03F8) { //0x03F8 eh o tamanho da memoria do 46K22
 				size = 5;
 				resp = NULL;
-				resp = (int *) malloc(size);
+				resp = (uint8_t *) malloc(size);
 
 				if (resp == NULL) {
 					free(resp);
 					return OUT_OF_MEMORY_EXCEPTION;
 				}
 
-				resp[0] = (int) my_address;
+				resp[0] = (uint8_t) my_address;
 				resp[1] = 0x90;
 				resp[2] = 0x02;
 				crc = CRC16(resp, 3);
@@ -261,7 +335,7 @@ exception_t slave_response() {
 
 				size = (size_t)(8);
 				resp = NULL;
-				resp = (int *) malloc(size);
+				resp = (uint8_t *) malloc(size);
 
 				if (resp == NULL) {
 					free(resp);
@@ -269,63 +343,25 @@ exception_t slave_response() {
 				}
 
 				for (cont = 0; cont < b_count; ++cont) {
-					write_eeprom(register_address + cont,
-							buff[cont + MODBUS_FIELDS_BYTE_COUNT + 1]);
+					if (register_address < 14 || register_address > 15)
+						write_eeprom(2 * register_address + cont,
+								buff[cont + MODBUS_FIELDS_BYTE_COUNT + 1]);
 				}
 
-				resp[0] = (int) my_address;
+				resp[0] = (uint8_t) my_address;
 				resp[1] = WRITE_MULTIPLE_REGISTERS_COMMAND;
-				resp[2] = (int) make8(register_address, 1);
-				resp[3] = (int) make8(register_address, 0);
-				resp[4] = (int) make8(register_value, 1);
-				resp[5] = (int) make8(register_value, 0);
+				resp[2] = (uint8_t) make8(register_address, 1);
+				resp[3] = (uint8_t) make8(register_address, 0);
+				resp[4] = (uint8_t) make8(register_value, 1);
+				resp[5] = (uint8_t) make8(register_value, 0);
 				crc = CRC16(resp, 6);
-				resp[6] = (int) make8(crc, 1);
-				resp[7] = (int) make8(crc, 0);
+				resp[6] = (uint8_t) make8(crc, 1);
+				resp[7] = (uint8_t) make8(crc, 0);
 			}
 
 			break;
 
 		default:
-			break;
-		}
-	}
-
-	m_cmd = 0;
-	m_cmd = make16(read_eeprom(CMD_ADDR), read_eeprom(CMD_ADDR + 1));
-	if ((int) m_cmd != CMD_IDLE) {
-
-#ifdef DEBUG
-		DEBUG_DATA("Recebido comando %lu\n", make16(read_eeprom(CMD_ADDR), read_eeprom(CMD_ADDR + 1)));
-#endif
-
-		write_eeprom(CMD_ADDR, 0);
-		write_eeprom(CMD_ADDR + 1, CMD_IDLE);
-		switch (register_value) {
-		case CMD_RESET:
-			rbt = TRUE;
-			break;
-		case CMD_RESET_INDEX:
-			diff_index = 0;
-			write_eeprom(DIFF_INDEX_ADDR_HH, 0);
-			write_eeprom(DIFF_INDEX_ADDR_LH, 0);
-			write_eeprom(DIFF_INDEX_ADDR_HL, 0);
-			write_eeprom(DIFF_INDEX_ADDR_LL, 0);
-#ifdef DEBUG
-			DEBUG_MSG("Index Reiniciado\n");
-#endif
-			break;
-		case CMD_LER_BLOCO:
-#ifdef DEBUG
-			DEBUG_MSG("Enviando block\n");
-#endif
-			free(resp);
-			return send_block();
-			break;
-		default:
-#ifdef DEBUG
-			DEBUG_MSG("Comando Desconhecido\n");
-#endif
 			break;
 		}
 	}
@@ -365,7 +401,7 @@ exception_t slave_response() {
 	return NO_EXCEPTION;
 }
 
-int modbus_init(void) {
+uint8_t modbus_init(void) {
 
 #ifdef USE_UART1
 	uc_turn_off_timer_rda();
@@ -378,7 +414,7 @@ int modbus_init(void) {
 #endif
 
 #ifdef USE_UART2
-	uc_clear_rda2_interrupt();
+	uc_clear_RDA2_INTERRUPT();
 	uc_turn_off_timer_rda2();
 	uc_set_timer_rda2();
 	clear_interrupt(INT_RDA2);
@@ -394,7 +430,7 @@ int modbus_init(void) {
 	return 0;
 }
 
-int parse_error(exception_t error, char *msg) {
+uint8_t parse_error(exception_t error, char *msg) {
 	switch (error) {
 	case NO_EXCEPTION:
 		strcpy(msg, "no errors");
@@ -424,9 +460,9 @@ int parse_error(exception_t error, char *msg) {
 	return 0;
 }
 
-long CRC16(int *nData, long wLength) {
-	int nTemp;
-	long wCRCWord = 0xFFFF;
+uint16_t CRC16(uint8_t *nData, uint16_t wLength) {
+	uint16_t nTemp;
+	uint16_t wCRCWord = 0xFFFF;
 
 	while (wLength--) {
 		nTemp = *nData++ ^ wCRCWord;
@@ -437,12 +473,13 @@ long CRC16(int *nData, long wLength) {
 	return wCRCWord;
 }
 
-int make_request(int dev_addr, long from, long size, int byte_count, int *data,
-		modbus_command_t command, int *req) {
-	long crc, cont;
+uint8_t make_request(uint8_t dev_addr, uint16_t from, uint16_t size,
+		uint8_t byte_count, uint8_t *data, modbus_command_t command,
+		uint8_t *req) {
+	uint16_t crc, cont;
 
 	req[0] = dev_addr;
-	req[1] = (int) command;
+	req[1] = (uint8_t) command;
 	req[2] = make8(from, 1);
 	req[3] = make8(from, 0);
 	req[4] = make8(size, 1);
@@ -473,8 +510,8 @@ int make_request(int dev_addr, long from, long size, int byte_count, int *data,
 	return 0;
 }
 
-void flush_buffer(int *buffer, long *index) {
-	long erase_cont;
+void flush_buffer(uint8_t *buffer, uint16_t *index) {
+	uint8_t erase_cont;
 
 	for (erase_cont = 0; erase_cont < *index; ++erase_cont)
 		buffer[erase_cont] = 0;
@@ -483,8 +520,8 @@ void flush_buffer(int *buffer, long *index) {
 }
 
 //funcao que leia a resposta do plc
-exception_t read_modbus_response(int *req, int *resp, door_t sl) {
-	long i, time_out, expected_size, cont, req_cont;
+exception_t read_modbus_response(uint8_t *req, uint8_t *resp, door_t sl) {
+	uint16_t i, time_out, expected_size, cont, req_cont;
 	modbus_command_t cmd;
 
 	i = 0;
@@ -495,6 +532,7 @@ exception_t read_modbus_response(int *req, int *resp, door_t sl) {
 
 	if (sl == SL1_DOOR) {
 #ifdef USE_UART1
+		disable_interrupts(RDA_INTERRUPT);
 		disable_interrupts(RDA_INTERRUPT);
 		index_rda = 0;
 #endif
@@ -582,7 +620,7 @@ exception_t read_modbus_response(int *req, int *resp, door_t sl) {
 			}
 		}
 
-		uc_clear_rda2_interrupt();
+		uc_clear_RDA2_INTERRUPT();
 		uc_turn_off_timer_rda2();
 		uc_set_timer_rda2();
 
@@ -603,8 +641,8 @@ exception_t read_modbus_response(int *req, int *resp, door_t sl) {
 
 	return NO_EXCEPTION;
 }
-exception_t mount_modbus_response(modbus_rx_t *modbus_response, int *resp) {
-	int cont, size, *data;
+exception_t mount_modbus_response(modbus_rx_t *modbus_response, uint8_t *resp) {
+	uint8_t cont, size, *data;
 
 	data = NULL;
 	size = resp[2];
@@ -614,7 +652,7 @@ exception_t mount_modbus_response(modbus_rx_t *modbus_response, int *resp) {
 	modbus_response->response_size = size;
 
 	free(modbus_response->data);
-	data = (int *) malloc((size_t) size);
+	data = (uint8_t *) malloc((size_t) size);
 
 	if (data == NULL) {
 		free(data);
@@ -630,9 +668,9 @@ exception_t mount_modbus_response(modbus_rx_t *modbus_response, int *resp) {
 	return NO_EXCEPTION;
 }
 
-short check_CRC(int *resp, modbus_command_t command) {
-	int *arr;
-	long ar_size, crc_check, crc_in, cont;
+bool check_CRC(uint8_t *resp, modbus_command_t command) {
+	uint8_t *arr;
+	uint16_t ar_size, crc_check, crc_in, cont;
 
 	switch (command) {
 	case READ_HOLDING_REGISTERS_COMMAND:
@@ -648,7 +686,7 @@ short check_CRC(int *resp, modbus_command_t command) {
 	}
 
 	arr = NULL;
-	arr = (int *) malloc((size_t) ar_size);
+	arr = (uint8_t *) malloc((size_t) ar_size);
 
 	if (arr == NULL) {
 		free(arr);
@@ -665,11 +703,11 @@ short check_CRC(int *resp, modbus_command_t command) {
 	return crc_check == crc_in;;
 }
 
-exception_t make_transaction(int dev_addr, long from, long size, int byte_count,
-		int *data, modbus_command_t command, modbus_rx_t *modbus_response,
-		door_t sl) {
-	int *req, *resp;
-	long resp_size;
+exception_t make_transaction(uint8_t dev_addr, uint16_t from, uint16_t size,
+		uint8_t byte_count, uint8_t *data, modbus_command_t command,
+		modbus_rx_t *modbus_response, door_t sl) {
+	uint8_t *req, *resp;
+	uint16_t resp_size;
 	exception_t resul;
 
 	resul = NO_EXCEPTION;
@@ -683,15 +721,15 @@ exception_t make_transaction(int dev_addr, long from, long size, int byte_count,
 		resp_size = (size_t)(size / 8 + 5);
 		else
 		resp_size = (size_t)(size / 8 + 6);
-		req = (int *) malloc((size_t) REQUEST_SIZE);
+		req = (uint8_t *) malloc((size_t) REQUEST_SIZE);
 		break;
 	case READ_HOLDING_REGISTERS_COMMAND:
 		resp_size = (size_t)(size << 1) + 5;
-		req = (int *) malloc((size_t) REQUEST_SIZE);
+		req = (uint8_t *) malloc((size_t) REQUEST_SIZE);
 		break;
 	case WRITE_MULTIPLE_REGISTERS_COMMAND:
 		resp_size = (size_t) 6;
-		req = (int *) malloc((size_t)(9 + byte_count));
+		req = (uint8_t *) malloc((size_t)(9 + byte_count));
 		break;
 	}
 
@@ -703,7 +741,7 @@ exception_t make_transaction(int dev_addr, long from, long size, int byte_count,
 	make_request(dev_addr, from, size, byte_count, data, command, req);
 
 	resp = NULL;
-	resp = (int *) malloc(resp_size * sizeof(int));
+	resp = (uint8_t *) malloc(resp_size * sizeof(uint8_t));
 
 	if (resp == NULL) {
 		free(req);
@@ -733,12 +771,12 @@ exception_t make_transaction(int dev_addr, long from, long size, int byte_count,
 	return NO_EXCEPTION;
 }
 
-int get_word_mem(modbus_rx_t *device, long *resp) {
-	long cont, size_bytes, size_array;
-	int aux_h, aux_l;
+uint8_t get_word_mem(modbus_rx_t *device, uint16_t *resp) {
+	uint8_t cont, size_bytes, size_array;
+	uint8_t aux_h, aux_l;
 
 	size_bytes = device->response_size;
-	size_array = device->response_size / sizeof(long);
+	size_array = device->response_size / sizeof(uint8_t);
 
 	for (cont = 0; cont < size_array; ++cont) {
 		aux_h = device->data[2 * cont];
@@ -749,8 +787,8 @@ int get_word_mem(modbus_rx_t *device, long *resp) {
 	return 0;
 }
 
-int get_byte_mem(modbus_rx_t *device, int *resp) {
-	int cont;
+uint8_t get_byte_mem(modbus_rx_t *device, uint16_t *resp) {
+	uint8_t cont;
 
 	for (cont = 0; cont < device->response_size; ++cont)
 		resp[cont] = device->data[cont];
@@ -758,8 +796,9 @@ int get_byte_mem(modbus_rx_t *device, int *resp) {
 	return 0;
 }
 
-exception_t transport(int dev_addr, long from, long size, int byte_count,
-		int *data, long *resp, modbus_command_t command, door_t sl) {
+exception_t transport(uint8_t dev_addr, uint16_t from, uint16_t size,
+		uint8_t byte_count, uint8_t *data, uint16_t *resp,
+		modbus_command_t command, door_t sl) {
 	modbus_rx_t *modbus_response;
 	exception_t exception;
 
@@ -801,27 +840,28 @@ exception_t transport(int dev_addr, long from, long size, int byte_count,
 
 }
 
-exception_t read_holding_registers(int dev_addr, long from, long size, long *to,
-		door_t sl) {
+exception_t read_holding_registers(uint8_t dev_addr, uint16_t from,
+		uint16_t size, uint16_t *to, door_t sl) {
 	return transport(dev_addr, from, size, 0, NULL, to,
 			READ_HOLDING_REGISTERS_COMMAND, sl);
 }
 
-exception_t read_discrete_inputs(int dev_addr, long from, long size, long *to,
-		door_t sl) {
+exception_t read_discrete_inputs(uint8_t dev_addr, uint16_t from, uint16_t size,
+		uint16_t *to, door_t sl) {
 
 	return transport(dev_addr, from, size, 0, NULL, to,
 			READ_DISCRETE_INPUT_COMMAND, sl);
 }
 
-exception_t read_coils(int dev_addr, long from, long size, long *to, door_t sl) {
+exception_t read_coils(uint8_t dev_addr, uint16_t from, uint16_t size,
+		uint16_t *to, door_t sl) {
 
 	return transport(dev_addr, from, size, 0, NULL, to, READ_COILS_COMMAND, sl);
 }
 
-exception_t send_modbus(int *data, long size) {
-	long cont;
-	int *ptr;
+exception_t send_modbus(uint8_t *data, uint16_t size) {
+	uint8_t cont;
+	uint8_t *ptr;
 
 	for (cont = 0, ptr = data; cont < size; cont++, ptr++) {
 #ifdef USE_UART1
@@ -839,23 +879,23 @@ exception_t send_modbus(int *data, long size) {
 	return NO_EXCEPTION;
 }
 
-exception_t return_error(int dev_addr, modbus_command_t command,
+exception_t return_error(uint8_t dev_addr, modbus_command_t command,
 		modbus_command_exception_code_t error) {
-	int *resp;
-	long crc, size;
+	uint8_t *resp;
+	uint16_t crc, size;
 
 	switch (command) {
 	case WRITE_SINGLE_REGISTER_COMMAND:
 		size = 5;
 		resp = NULL;
-		resp = (int *) malloc((size_t)(size * sizeof(int)));
+		resp = (uint8_t *) malloc((size_t)(size * sizeof(uint8_t)));
 
 		if (resp == NULL) {
 			free(resp);
 			return OUT_OF_MEMORY_EXCEPTION;
 		}
 
-		resp[0] = (int) my_address;
+		resp[0] = (uint8_t) get_byte(ADDR_MY_B);
 		resp[1] = 0x86;
 		resp[2] = error;
 		crc = CRC16(resp, 3);
@@ -873,8 +913,8 @@ exception_t return_error(int dev_addr, modbus_command_t command,
 	return NO_EXCEPTION;
 }
 
-exception_t write_multiple_registers(int dev_addr, long from, long size,
-		long byte_count, int *data, door_t sl) {
+exception_t write_multiple_registers(uint8_t dev_addr, uint16_t from,
+		uint16_t size, uint16_t byte_count, uint8_t *data, door_t sl) {
 
 	if (size < 3) {
 		return NOT_SUPPORTED_EXCEPTION;
